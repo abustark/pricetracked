@@ -1,12 +1,23 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
+import {
+  DEFAULT_SCAN_EVERY_HOURS,
+  INTER_PRODUCT_DELAY_MS,
+  SCAN_LOCK_TTL_MINUTES,
+  getCronScanLimit,
+  getCronTimeBudgetMs,
+  getEffectiveScanEveryHours
+} from "@/lib/schedule";
 import { assertAllowedProductUrl, canonicalizeStoreUrl, detectStore, getStoreLabel, resolveSupportedProductUrl } from "@/lib/stores";
 import type { PriceSampleDocument, ProductDocument, ScanResult, StoreKey } from "@/lib/types";
+import { assertSafeFetchTarget } from "@/lib/url-guard";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 18000;
 const MAX_ATTEMPTS = 3;
+const MAX_REDIRECT_HOPS = 5;
+const MAX_RESPONSE_BYTES = 2_000_000;
 
 type ParsedProduct = {
   title: string;
@@ -88,8 +99,10 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
     imageUrl: snapshot.imageUrl,
     currency: snapshot.currency,
     active: true,
-    scanEveryHours: existing?.scanEveryHours || 6,
-    nextScanAt: new Date(now.getTime() + (existing?.scanEveryHours || 6) * 60 * 60 * 1000),
+    scanEveryHours: existing?.scanEveryHours || DEFAULT_SCAN_EVERY_HOURS,
+    nextScanAt: new Date(
+      now.getTime() + getEffectiveScanEveryHours(existing?.scanEveryHours) * 60 * 60 * 1000
+    ),
     lastScannedAt: now,
     lastPrice: snapshot.price,
     mrp: snapshot.mrp || existing?.mrp,
@@ -133,10 +146,95 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
   };
 }
 
-export async function scanDueProducts(limit = 20) {
+export type DueScanOutcome = {
+  id: string;
+  ok: boolean;
+  skipped?: "locked" | "time-budget";
+  error?: string;
+};
+
+/**
+ * Atomically claim a product for scanning. Uses findOneAndUpdate on the
+ * due-state + unlocked condition so concurrent cron/manual triggers can never
+ * both claim the same product. Stale locks (crashed worker) expire on their own
+ * once `scanLockUntil` passes.
+ */
+export async function claimProductScan(
+  productId: ObjectId,
+  now = new Date()
+): Promise<ProductDocument | null> {
+  const db = await getDb();
+  const lockUntil = new Date(now.getTime() + SCAN_LOCK_TTL_MINUTES * 60 * 1000);
+  const claimed = await db
+    .collection<ProductDocument>("products")
+    .findOneAndUpdate(
+      {
+        _id: productId,
+        active: true,
+        $or: [{ scanLockUntil: { $exists: false } }, { scanLockUntil: null }, { scanLockUntil: { $lte: now } }]
+      },
+      {
+        $set: { scanLockUntil: lockUntil, scanStartedAt: now, lastAttemptAt: now, updatedAt: now }
+      },
+      { returnDocument: "after" }
+    );
+  return claimed ?? null;
+}
+
+/** Release the scan lock and record the scan outcome. Never erases lastPrice. */
+async function releaseScanLock(
+  product: ProductDocument,
+  outcome: { ok: boolean; error?: string },
+  now = new Date()
+): Promise<void> {
+  const db = await getDb();
+  const productId = product._id;
+  if (!productId) return;
+
+  if (outcome.ok) {
+    await db.collection<ProductDocument>("products").updateOne(
+      { _id: productId },
+      {
+        $unset: { scanLockUntil: "", scanStartedAt: "" },
+        $set: { failureCount: 0, updatedAt: now }
+      }
+    );
+    return;
+  }
+
+  // Failed scan: keep the last valid price, record the error, schedule the next
+  // attempt at the effective cadence (cron fires daily on Vercel Hobby).
+  const cadenceHours = getEffectiveScanEveryHours(product.scanEveryHours);
+  await db.collection<ProductDocument>("products").updateOne(
+    { _id: productId },
+    {
+      $unset: { scanLockUntil: "", scanStartedAt: "" },
+      $set: {
+        lastError: outcome.error || "Scan failed.",
+        lastAttemptAt: now,
+        failureCount: (product.failureCount || 0) + 1,
+        nextScanAt: new Date(now.getTime() + cadenceHours * 60 * 60 * 1000),
+        updatedAt: now
+      }
+    }
+  );
+}
+
+/**
+ * Scan due products. Every product is atomically claimed before fetching, so
+ * overlapping cron runs or a manual rescan cannot double-scan. The batch is
+ * bounded (CRON_SCAN_LIMIT, default 10) and the run is bounded by a wall-clock
+ * budget (45s) so the serverless function never exceeds its duration limit.
+ * Products are processed sequentially (bounded concurrency = 1) with a short
+ * respectful delay between stores.
+ */
+export async function scanDueProducts(limit?: number): Promise<DueScanOutcome[]> {
   const db = await getDb();
   const now = new Date();
-  const products = await db
+  const batchLimit = Math.min(Math.max(limit ?? getCronScanLimit(), 1), 50);
+  const startedAt = Date.now();
+
+  const due = await db
     .collection<ProductDocument>("products")
     .find({
       active: true,
@@ -144,28 +242,34 @@ export async function scanDueProducts(limit = 20) {
       userId: { $exists: true, $nin: ["", "guest"] }
     })
     .sort({ nextScanAt: 1 })
-    .limit(limit)
+    .limit(batchLimit)
     .toArray();
 
-  const results = [];
-  for (const product of products) {
+  const results: DueScanOutcome[] = [];
+
+  for (const product of due) {
+    if (Date.now() - startedAt > getCronTimeBudgetMs()) {
+      results.push({ id: product._id?.toString() || "", ok: false, skipped: "time-budget" });
+      continue;
+    }
+
+    const claimed = await claimProductScan(product._id!, now);
+    if (!claimed) {
+      results.push({ id: product._id?.toString() || "", ok: false, skipped: "locked" });
+      continue;
+    }
+
     try {
-      const updated = await scanAndSaveProduct(product.normalizedUrl, product.userId);
-      results.push({ id: updated._id?.toString(), ok: true });
+      await scanAndSaveProduct(claimed.normalizedUrl, claimed.userId);
+      await releaseScanLock(claimed, { ok: true }, new Date());
+      results.push({ id: claimed._id?.toString() || "", ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown scan error";
-      await db.collection<ProductDocument>("products").updateOne(
-        { _id: product._id },
-        {
-          $set: {
-            lastError: message,
-            nextScanAt: new Date(now.getTime() + product.scanEveryHours * 60 * 60 * 1000),
-            updatedAt: now
-          }
-        }
-      );
-      results.push({ id: product._id?.toString(), ok: false, error: message });
+      await releaseScanLock(claimed, { ok: false, error: message }, new Date());
+      results.push({ id: claimed._id?.toString() || "", ok: false, error: message });
     }
+
+    await sleep(INTER_PRODUCT_DELAY_MS);
   }
 
   return results;
@@ -177,42 +281,62 @@ async function fetchHtml(
   mode: "direct" | "proxy"
 ): Promise<{ html: string; source: "direct" | "proxy" }> {
   const proxyConfig = getProxyConfig();
-  let target = mode === "proxy" ? buildProxyUrl(url, proxyConfig) : url;
+  const baseTarget = mode === "proxy" ? buildProxyUrl(url, proxyConfig) : url;
   let lastError: unknown;
-  let redirects = 0;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetchWithTimeout(target, {
-        redirect: mode === "direct" ? "manual" : "follow",
-        headers: {
-          ...buildBrowserHeaders(store, target),
-          ...buildProxyHeaders(proxyConfig)
-        },
-        cache: "no-store"
-      });
+      let redirects = 0;
+      let target = baseTarget;
 
-      if (mode === "direct" && isRedirect(response.status)) {
-        redirects += 1;
-        if (redirects > 5) throw new Error("The store returned too many redirects.");
-        target = followSafeRedirect(target, response, store);
-        continue;
+      // Every redirect hop re-enters this loop and is re-validated before the
+      // next fetch — no unchecked redirect chain is ever followed automatically.
+      while (true) {
+        if (mode === "direct") {
+          await assertSafeFetchTarget(target);
+        } else {
+          assertProxyTarget(target, proxyConfig);
+        }
+
+        const response = await fetchWithTimeout(target, {
+          // Both paths follow redirects manually; the proxy is no longer allowed
+          // to auto-follow an unchecked chain on our behalf.
+          redirect: "manual",
+          headers: {
+            ...buildBrowserHeaders(store, mode === "direct" ? target : url),
+            ...buildProxyHeaders(proxyConfig)
+          },
+          cache: "no-store"
+        });
+
+        if (isRedirect(response.status)) {
+          redirects += 1;
+          if (redirects > MAX_REDIRECT_HOPS) {
+            throw new Error("The store returned too many redirects.");
+          }
+          target =
+            mode === "direct"
+              ? followSafeRedirect(target, response, store)
+              : followProxyRedirect(target, response);
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Store request failed with HTTP ${response.status}`);
+        }
+
+        assertHtmlResponse(response);
+        const html = await readBodyWithCap(response, MAX_RESPONSE_BYTES);
+        if (looksBlocked(html)) {
+          throw new Error("The store returned a bot-check or blocked response instead of the product page.");
+        }
+
+        return { html, source: mode };
       }
-
-      if (!response.ok) {
-        throw new Error(`Store request failed with HTTP ${response.status}`);
-      }
-
-      const html = await response.text();
-      if (looksBlocked(html)) {
-        throw new Error("The store returned a bot-check or blocked response instead of the product page.");
-      }
-
-      return { html, source: mode };
     } catch (error) {
       lastError = error;
       if (!isRetryableFetchError(error) || attempt === MAX_ATTEMPTS) break;
-      await sleep(350 * attempt);
+      await sleep(Math.min(1000 * attempt, 3000));
     }
   }
 
@@ -233,12 +357,81 @@ function buildProxyUrl(url: string, config: ProxyConfig): string {
   if (!config.endpoint) return url;
 
   const proxy = new URL(config.endpoint);
+  if (!["https:", "http:"].includes(proxy.protocol)) {
+    // Misconfigured endpoint: never route fetches through a non-web scheme.
+    return url;
+  }
+
   proxy.searchParams.set(config.urlParam, url);
   if (config.token && config.tokenParam && !config.authHeader) {
     proxy.searchParams.set(config.tokenParam, config.token);
   }
 
   return proxy.toString();
+}
+
+/** The proxy endpoint is operator-configured infrastructure: require web
+ * protocol, no credentials, and the exact configured origin. */
+function assertProxyTarget(target: string, config: ProxyConfig): void {
+  const url = new URL(target);
+  if (!["https:", "http:"].includes(url.protocol)) {
+    throw new Error("The scraper proxy endpoint must use http or https.");
+  }
+  if (url.username || url.password) {
+    throw new Error("The scraper proxy endpoint must not embed credentials in the URL.");
+  }
+  if (config.endpoint && url.origin !== new URL(config.endpoint).origin) {
+    throw new Error("The proxy redirected to an unexpected origin.");
+  }
+}
+
+function followProxyRedirect(currentUrl: string, response: Response): string {
+  const location = response.headers.get("location");
+  if (!location) {
+    throw new Error("The proxy redirected without a destination URL.");
+  }
+  return new URL(location, currentUrl).toString();
+}
+
+/** Reject clearly non-HTML or binary responses before parsing. */
+function assertHtmlResponse(response: Response): void {
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!contentType) return; // No header: fall through to parsing as before.
+  if (/^(image|video|audio)\//.test(contentType) || /application\/(pdf|zip|gzip|octet-stream|json)\b/.test(contentType)) {
+    throw new Error("The store returned a non-HTML response instead of the product page.");
+  }
+}
+
+/** Read the body as text while enforcing a hard size cap — never buffer an
+ * arbitrarily large page. Aborts the stream once the cap is exceeded. */
+async function readBodyWithCap(response: Response, cap: number): Promise<string> {
+  const body = response.body;
+  if (!body) return "";
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let output = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > cap) {
+        throw new Error("The store response was too large to read.");
+      }
+      output += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // Stream already closed — nothing to release.
+    }
+  }
+
+  return output + decoder.decode();
 }
 
 function buildProxyHeaders(config: ProxyConfig): Record<string, string> {

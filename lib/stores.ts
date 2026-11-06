@@ -56,9 +56,8 @@ export function detectShortLinkStore(input: string): Exclude<StoreKey, "other"> 
 
 export async function resolveSupportedProductUrl(input: string): Promise<string> {
   const url = new URL(input);
-  if (!["https:", "http:"].includes(url.protocol)) {
-    throw new Error("Only http and https product links are supported.");
-  }
+  assertWebProtocol(url);
+  assertNoUrlCredentials(url);
 
   const directStore = detectStore(input);
   if (directStore) {
@@ -95,9 +94,8 @@ export function normalizeProductUrl(input: string): string {
 
 export function assertAllowedProductUrl(input: string): { store: StoreKey; normalizedUrl: string } {
   const url = new URL(input);
-  if (!["https:", "http:"].includes(url.protocol)) {
-    throw new Error("Only http and https product links are supported.");
-  }
+  assertWebProtocol(url);
+  assertNoUrlCredentials(url);
 
   const store = detectStore(input);
   if (!store) {
@@ -105,6 +103,20 @@ export function assertAllowedProductUrl(input: string): { store: StoreKey; norma
   }
 
   return { store, normalizedUrl: normalizeProductUrl(input) };
+}
+
+/** Only intended web protocols may be fetched. */
+export function assertWebProtocol(url: URL): void {
+  if (!["https:", "http:"].includes(url.protocol)) {
+    throw new Error("Only http and https product links are supported.");
+  }
+}
+
+/** Reject URLs with embedded credentials (`user:pass@host`) outright. */
+export function assertNoUrlCredentials(url: URL): void {
+  if (url.username || url.password) {
+    throw new Error("Product URLs with embedded credentials are not supported.");
+  }
 }
 
 export function getStoreLabel(store: StoreKey, url?: string, storedLabel?: string): string {
@@ -141,24 +153,123 @@ export function canonicalizeStoreUrl(input: string, store: StoreKey): string {
   return url.toString();
 }
 
-function isSafePublicHostname(hostname: string): boolean {
-  const value = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (!value || value === "localhost" || value.endsWith(".local") || value.endsWith(".internal")) return false;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(value)) return false;
+/**
+ * String-level safety check for a hostname OR a literal IP address.
+ * Rejects localhost/link-local site names and every private, loopback,
+ * link-local, CGNAT, benchmark, multicast or reserved IPv4/IPv6 form,
+ * including numeric encodings (decimal `2130706433`, hex `0x7f000001`,
+ * octal `0177.0.0.1`) and IPv4-mapped IPv6. Fails closed on malformed
+ * numeric hosts. This alone is NOT a complete SSRF defence — pair it with
+ * DNS resolution checks (lib/url-guard.ts) before fetching.
+ */
+export function isSafePublicHostname(hostname: string): boolean {
+  const value = hostname.toLowerCase().trim().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
+  if (!value) return false;
+  if (value === "localhost" || value.endsWith(".localhost") || value.endsWith(".local") || value.endsWith(".internal") || value.endsWith(".home.arpa")) {
+    return false;
+  }
 
-  const private172 = value.match(/^172\.(\d+)\./);
-  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return false;
-  if (value === "0.0.0.0" || value === "::1") return false;
+  // IPv6 literal (URL.hostname keeps brackets stripped here via the replace above,
+  // and a raw hostname can still contain colons).
+  if (value.includes(":")) return isSafePublicIpv6(value);
+
+  // A public store hostname always contains a letter. Pure-numeric hosts
+  // (decimal/hex single-integer IPv4 forms) are rejected outright.
+  if (!/[a-z]/.test(value)) return false;
+
+  if (isIpv4Like(value)) return isSafePublicIpv4(value);
+
+  return true;
+}
+
+function isIpv4Like(value: string): boolean {
+  const parts = value.split(".");
+  if (parts.length === 4) {
+    return parts.every((part) => /^\d+$/.test(part) || /^0x[0-9a-f]+$/i.test(part));
+  }
+  // Legacy 1–3 part numeric forms (a, a.b, a.b.c) — never valid store hosts.
+  return false;
+}
+
+function parseIpPart(part: string): number | null {
+  if (/^0x[0-9a-f]+$/i.test(part)) {
+    const parsed = parseInt(part, 16);
+    return Number.isFinite(parsed) && parsed <= 255 ? parsed : null;
+  }
+  if (/^0\d+$/.test(part)) {
+    const parsed = parseInt(part, 8); // octal form, e.g. 0177 = 127
+    return Number.isFinite(parsed) && parsed <= 255 ? parsed : null;
+  }
+  const parsed = Number(part);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 255 ? parsed : null;
+}
+
+function isSafePublicIpv4(value: string): boolean {
+  const parts = value.split(".");
+  let octets: number[];
+
+  if (parts.length === 4) {
+    const parsed = parts.map(parseIpPart);
+    // Malformed numeric components (overflowing octet, bad hex/octal) fail closed.
+    if (parsed.some((octet) => octet === null)) return false;
+    octets = parsed as number[];
+  } else {
+    return false; // unreachable — isIpv4Like gated above; kept for safety
+  }
+
+  const [a, b, c] = octets;
+  if (a === 0 || a === 10 || a === 127) return false; // this-network, private, loopback
+  if (a === 169 && b === 254) return false; // link-local
+  if (a === 172 && b >= 16 && b <= 31) return false; // private
+  if (a === 192 && b === 168) return false; // private
+  if (a === 100 && b >= 64 && b <= 127) return false; // CGNAT 100.64.0.0/10
+  if (a === 192 && b === 0 && c === 0) return false; // IETF protocol assignments
+  if (a === 198 && (b === 18 || b === 19)) return false; // benchmarking
+  if (a === 203 && b === 0 && c === 113) return false; // documentation
+  if (a >= 224) return false; // multicast (224-239), reserved, broadcast (255)
+  return true;
+}
+
+function isSafePublicIpv6(value: string): boolean {
+  const v = value.toLowerCase();
+  if (v === "::" || v === "::1") return false; // unspecified, loopback
+
+  // IPv4-mapped / IPv4-compatible (::ffff:a.b.c.d) — treat fail-closed.
+  if (v.includes("::ffff:")) return false;
+  const embeddedV4 = v.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (embeddedV4) return false;
+
+  // link-local fe80::/10, unique-local fc00::/7, multicast ff00::/8
+  if (/^fe[89ab]/.test(v)) return false;
+  if (/^f[cd]/.test(v)) return false;
+  if (/^ff/.test(v)) return false;
+
+  // documentation 2001:db8::/32, 6to4 2002::/16 (embeds arbitrary IPv4), Teredo 2001::/32
+  if (v.startsWith("2001:db8:")) return false;
+  if (v.startsWith("2002:")) return false;
+  if (v.startsWith("2001:0:")) return false;
+
+  // Only global unicast (first hextet 2xxx/3xxx, minus the blocks above) passes.
+  const firstHextet = v.split(":")[0];
+  if (!/^[23][0-9a-f]{3}$/.test(firstHextet)) return false;
+
   return true;
 }
 
 async function followKnownShortLink(input: string): Promise<string> {
   let current = input;
 
-  for (let index = 0; index < 5; index += 1) {
-    const response = await fetchRedirect(current, "HEAD");
+  for (let hop = 0; hop < 5; hop += 1) {
+    assertSafeShortLinkHop(current);
 
-    if (response.status >= 300 && response.status < 400) {
+    let response = await fetchRedirect(current, "HEAD");
+
+    // Some shorteners reject HEAD; retry the same hop with GET (still manual).
+    if (!isRedirectStatus(response.status)) {
+      response = await fetchRedirect(current, "GET");
+    }
+
+    if (isRedirectStatus(response.status)) {
       const location = response.headers.get("location");
       if (!location) break;
       current = new URL(location, current).toString();
@@ -167,23 +278,32 @@ async function followKnownShortLink(input: string): Promise<string> {
       continue;
     }
 
-    if (response.url && response.url !== current) {
-      current = response.url;
-    }
     break;
   }
 
   if (detectStore(current)) return current;
 
-  const response = await fetchRedirect(input, "GET");
-  return response.url || current;
+  throw new Error("Could not resolve this short link. Paste the final product URL if the short link fails.");
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status < 400;
+}
+
+function assertSafeShortLinkHop(input: string): void {
+  const url = new URL(input);
+  assertWebProtocol(url);
+  assertNoUrlCredentials(url);
+  if (!isSafePublicHostname(url.hostname)) {
+    throw new Error("The short link redirected to a non-public host.");
+  }
 }
 
 async function fetchRedirect(input: string, method: "GET" | "HEAD") {
   try {
     return await fetch(input, {
       method,
-      redirect: method === "GET" ? "follow" : "manual",
+      redirect: "manual",
       headers: {
         accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "accept-language": "en-IN,en-US;q=0.9,en;q=0.8",

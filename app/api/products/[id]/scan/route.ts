@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { sanitizeErrorMessage } from "@/lib/errors";
-import { scanAndSaveProduct } from "@/lib/scanner";
+import { claimProductScan, releaseScanLock, scanAndSaveProduct } from "@/lib/scanner";
 import { getViewer } from "@/lib/viewer";
 import type { ProductDocument } from "@/lib/types";
 
@@ -29,11 +29,26 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
+  // Atomically claim the scan so a manual rescan cannot race a cron run (or
+  // another manual rescan) into a duplicate simultaneous scan.
+  const claimed = await claimProductScan(product._id!);
+  if (!claimed) {
+    return NextResponse.json(
+      { error: "A scan is already in progress for this product. Try again in a minute." },
+      { status: 409 }
+    );
+  }
+
   try {
-    const updated = await scanAndSaveProduct(product.normalizedUrl, viewer.userId);
+    const updated = await scanAndSaveProduct(claimed.normalizedUrl, viewer.userId);
+    await releaseScanLock(claimed, { ok: true });
     return NextResponse.json({ product: { ...updated, _id: updated._id?.toString() } });
   } catch (error) {
-    const message = sanitizeErrorMessage(error, "Scan failed. Please try again.");
-    return NextResponse.json({ error: message }, { status: 400 });
+    const rawMessage = error instanceof Error ? error.message : "Scan failed.";
+    await releaseScanLock(claimed, { ok: false, error: rawMessage });
+    return NextResponse.json(
+      { error: sanitizeErrorMessage(error, "Scan failed. Please try again.") },
+      { status: 400 }
+    );
   }
 }

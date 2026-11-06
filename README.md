@@ -83,7 +83,9 @@ The included `vercel.json` registers a cron job:
 
 Vercel Cron sends an HTTP `GET` request to the configured path in production. The schedule runs in UTC. Vercel Hobby projects are limited to daily cron jobs; on Pro you can change the schedule back to every 6 hours with `0 */6 * * *`.
 
-> **Scheduler constraint (Vercel Hobby):** this project runs on the free Hobby plan, which permits **daily cron only** (`0 0 * * *`). Scans therefore happen at most once per day in production regardless of the per-product `scanEveryHours` setting. Do not advertise a 6-hour cadence while on Hobby; the product default and UI copy must say 24h (see `AGENTS.md`). Only after upgrading to Pro may the schedule become `0 */6 * * *`.
+> **Scheduler constraint (Vercel Hobby):** this project runs on the free Hobby plan, which permits **daily cron only** (`0 0 * * *`). Scans therefore happen at most once per day in production regardless of the per-product `scanEveryHours` setting. The UI always shows the **effective** cadence — `max(scanEveryHours, 24)` from `lib/schedule.ts` — so products never advertise a 6-hour cadence they cannot get. Only after upgrading to Pro may the schedule become `0 */6 * * *`.
+
+**Cron run safety:** each cron run scans at most `CRON_SCAN_LIMIT` products (default 10, max 50) sequentially within a ~45s wall-clock budget (`CRON_TIME_BUDGET_MS`). Before any fetch, a product is claimed with an atomic `scanLockUntil` lock (5-minute TTL, stale locks self-expire) via `claimProductScan()` — overlapping cron runs and manual rescans cannot double-scan the same product. Failed scans preserve the last valid price, record `lastError`/`lastAttemptAt`, and retry at the next scheduled run; the product page shows the last successful scan separately from the last failed attempt.
 
 ## Price History Provenance
 

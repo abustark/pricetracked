@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { notFound } from "next/navigation";
 import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
+import { getEffectiveScanEveryHours } from "@/lib/schedule";
 import { getViewer } from "@/lib/viewer";
 import type { PriceSampleDocument, ProductDocument } from "@/lib/types";
 import { PriceChart } from "@/components/PriceChart";
@@ -72,7 +73,10 @@ export default async function ProductPage({ params }: Props) {
               <a className="meta-chip" href={product.normalizedUrl} target="_blank" rel="noreferrer">
                 Open store page <Icon name="external" size={12} />
               </a>
-              <span className="meta-chip">Every {product.scanEveryHours}h</span>
+              <span className="meta-chip">Every {getEffectiveScanEveryHours(product.scanEveryHours)}h</span>
+              {product.lastScannedAt ? (
+                <span className="meta-chip">Scanned {formatDate(product.lastScannedAt.toISOString())}</span>
+              ) : null}
               {product.mrp && product.lastPrice && product.mrp > product.lastPrice ? (
                 <span className="meta-chip" style={{ color: "rgb(245, 158, 11)", borderColor: "rgba(245, 158, 11, 0.3)" }}>
                   MRP {formatMoney(product.mrp, product.currency)} • {Math.round(((product.mrp - product.lastPrice) / product.mrp) * 100)}% off
@@ -91,7 +95,12 @@ export default async function ProductPage({ params }: Props) {
             ) : null}
           </div>
         </div>
-        {product.lastError ? <p className="error">Last scan error: {product.lastError}</p> : null}
+        {product.lastError ? (
+          <p className="error" role="status">
+            Last scan attempt{product.lastAttemptAt ? ` on ${formatDate(product.lastAttemptAt.toISOString())}` : ""} failed: {product.lastError}. Showing the last valid price
+            {product.lastScannedAt ? ` from ${formatDate(product.lastScannedAt.toISOString())}` : ""}; it will refresh at the next scheduled scan.
+          </p>
+        ) : null}
         <div className="product-actions" role="group" aria-label="Product actions">
           <RescanButton productId={id} />
           <ResetHistoryButton productId={id} />

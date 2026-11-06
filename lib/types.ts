@@ -17,6 +17,10 @@ export type ProductDocument = {
   scanEveryHours: number;
   nextScanAt: Date;
   lastScannedAt?: Date;
+  lastAttemptAt?: Date;
+  scanLockUntil?: Date;
+  scanStartedAt?: Date;
+  failureCount?: number;
   lastPrice?: number;
   mrp?: number;
   discountPercent?: number;
