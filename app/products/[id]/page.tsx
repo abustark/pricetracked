@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ObjectId } from "mongodb";
 import { notFound } from "next/navigation";
-import { calculatePriceStats } from "@/lib/analytics";
+import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import type { PriceSampleDocument, ProductDocument } from "@/lib/types";
@@ -39,7 +39,7 @@ export default async function ProductPage({ params }: Props) {
 
   const samples = await db
     .collection<PriceSampleDocument>("price_samples")
-    .find({ productId })
+    .find({ productId, source: { $in: [...OBSERVED_SOURCES] } })
     .sort({ capturedAt: 1 })
     .limit(1000)
     .toArray();
@@ -139,23 +139,16 @@ export default async function ProductPage({ params }: Props) {
           <div className="panel-heading-row"><h2>Recent scans</h2><span className="list-count">{samples.length} total</span></div>
           <div className="samples">
             {[...samples].reverse().slice(0, 12).map((sample) => {
-              const isHistorical = sample.source === "historical" || sample.source === "mrp-baseline";
               return (
                 <div className="sample-row" key={sample._id?.toString()}>
                   <div>
                     <span>{formatDate(sample.capturedAt.toISOString())}</span>
                     <small>
-                      {sample.source === "mrp-baseline"
-                        ? "MRP baseline"
-                        : sample.source === "historical"
-                        ? "Historical"
-                        : sample.source === "proxy"
-                        ? "Proxy scan"
-                        : "Live scan"}
+                      {sample.source === "proxy" ? "Proxy scan" : "Live scan"}
                       {sample.inStock === false ? " · Out of stock" : ""}
                     </small>
                   </div>
-                  <strong style={{ opacity: isHistorical ? 0.85 : 1 }}>
+                  <strong>
                     {formatMoney(sample.price, sample.currency)}
                   </strong>
                 </div>

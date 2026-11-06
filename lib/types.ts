@@ -23,8 +23,6 @@ export type ProductDocument = {
   targetPrice?: number;
   targetPriceReached?: boolean;
   targetAlertEnabled?: boolean;
-  historyBackfilled?: boolean;
-  historyBackfilledAt?: Date;
   lastError?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -50,11 +48,6 @@ export type ScanResult = {
   imageUrl?: string;
   inStock?: boolean;
   source: "direct" | "proxy";
-  historicalPrices?: Array<{
-    price: number;
-    capturedAt: Date;
-    source: "historical" | "mrp-baseline";
-  }>;
 };
 
 export type DealVerdict = "buy_now" | "fair_price" | "wait";

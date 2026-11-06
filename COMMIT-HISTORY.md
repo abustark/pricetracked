@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.2`** (current head is `2.0.1` — see below)
+> - **`main` → `2.0.3`** (current head is `2.0.2` — see below)
 
 ---
 
@@ -34,3 +34,20 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - Local folder lives at `D:\projects\pricetracked` (fresh clone of the renamed repo; old `price-trail` folder locked by OS and needs manual deletion).
   - `price_tracker` MongoDB database name in `.env.example`, `lib/db.ts` default and `README.md` left unchanged — it is a data identifier, not the project brand; renaming it would need a DB migration.
   - `abufolio.vercel.app` portfolio credit left unchanged — it is the owner's separate portfolio site.
+
+### 2.0.2 - genuine price history only (P0 provenance fix)
+
+- **Date**: 2026-11-06
+- **Why**: completion-guide Priority 0 — synthetic baseline values (six invented `historical`/`mrp-baseline` points from `generateHistoricalBaseline()`) were influencing all statistics, chart timeline and BUY/WAIT advice. Price history must reflect real observations only.
+- **Changes**:
+  - `lib/scanner.ts`: removed `queueHistoricalBackfill` import and first-track backfill queue call — a new product now starts with exactly one genuine `direct`/`proxy` observation.
+  - `lib/analytics.ts`: added `OBSERVED_SOURCES` (`direct`/`proxy`), `isObservedSample`, `selectObservedSamples` (filters synthetic rows before every stat; mixed-currency samples reduced to the latest observed currency); `calculatePriceStats` + `generateBuyAdvice` operate on observed samples only, including sample count and percentile/score.
+  - `lib/history.ts` deleted (generator, FIFO queue and backfill logic — no dormant code left).
+  - `lib/types.ts`: dropped `historyBackfilled`/`historyBackfilledAt` from `ProductDocument` and the unused `historicalPrices` field from `ScanResult`.
+  - `app/products/[id]/page.tsx` + `app/api/products/[id]/route.ts`: sample queries now fetch `source ∈ {direct, proxy}` only; "Recent scans" labels simplified to Live/Proxy scan (no more Historical/MRP baseline rows).
+  - `components/PriceChart.tsx`: removed synthetic dot styling, "Historical" legend entry and mrp-baseline tag — chart timeline, legend, snapshot count and ARIA summary show observed samples only.
+  - `scripts/migrate-synthetic-history.mjs`: new idempotent migration — dry-run by default (counts by source), `--execute` writes a JSON backup then deletes only records with source `historical`/`mrp-baseline` (+ sane price/date checks) and unsets retired `historyBackfilled` flags on affected products; `--restore=<file>` re-inserts a backup; `direct`/`proxy` samples are never touched.
+  - `README.md`: new "Price History Provenance" section (migration run/rollback steps) and an explicit **Vercel Hobby daily-cron-only scheduler constraint** note (owner decision: Option B — stay honest at 24h until Pro).
+  - `AGENTS.md`: new "Scheduler & Vercel Hobby Constraint" section for AI agents (daily cron only, never advertise 6h on Hobby, never reintroduce synthetic history).
+  - `PROJECT-INFO.md`: removed all backfill/synthesis claims; documents genuine-history-only behaviour.
+- **Intentionally deferred to next batches**: scheduler cadence/scan-lock/retry work (P1 → `2.0.3`), in-app target alert events (P2 → `2.0.4`), tests/observability/a11y (P3+P4 → `2.0.5`).

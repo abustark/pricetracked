@@ -6,7 +6,7 @@ import { Icon } from "@/components/Icons";
 type ChartSample = {
   price: number;
   capturedAt: string;
-  source?: "direct" | "proxy" | "historical" | "mrp-baseline";
+  source?: "direct" | "proxy";
 };
 
 export function PriceChart({
@@ -50,8 +50,7 @@ export function PriceChart({
           ? width / 2
           : padding + (index / (chartSamples.length - 1)) * (width - padding * 2);
       const y = height - padding - ((sample.price - min) / range) * (height - padding * 2);
-      const isHistorical = sample.source === "historical" || sample.source === "mrp-baseline";
-      return { x, y, sample, isHistorical, index };
+      return { x, y, sample, index };
     });
   }, [chartSamples, min, range, width, height, padding]);
 
@@ -68,7 +67,6 @@ export function PriceChart({
   );
 
   const mrpY = mrp ? height - padding - ((mrp - min) / range) * (height - padding * 2) : undefined;
-  const hasHistorical = points.some((p) => p.isHistorical);
 
   // Determine current active point (defaults to latest point if none hovered, or hovered point)
   const activePoint = activeIndex !== null ? points[activeIndex] : null;
@@ -112,13 +110,7 @@ export function PriceChart({
         {activePoint ? (
           <div className="chart-active-info">
             <span className="chart-active-tag">
-              {activePoint.sample.source === "mrp-baseline"
-                ? "MRP baseline"
-                : activePoint.isHistorical
-                ? "Historical"
-                : activePoint.sample.source === "proxy"
-                ? "Proxy scan"
-                : "Live scan"}
+              {activePoint.sample.source === "proxy" ? "Proxy scan" : "Live scan"}
             </span>
             <strong className="chart-active-price">
               {formatMoney(activePoint.sample.price, currency)}
@@ -261,32 +253,18 @@ export function PriceChart({
           {/* Data Points */}
           {points.map((point, index) => {
             const isLatest = index === points.length - 1;
-            const isHist = point.isHistorical;
             const isActive = activeIndex === index;
 
             return (
               <g key={`${point.sample.capturedAt}-${point.sample.price}-${index}`}>
-                {isHist ? (
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={isActive ? 6 : 4}
-                    fill="var(--surface)"
-                    stroke="var(--accent)"
-                    strokeWidth={isActive ? 3 : 2}
-                    strokeDasharray={isActive ? "none" : "2 2"}
-                    opacity={isActive ? 1 : 0.85}
-                  />
-                ) : (
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={isActive ? 7.5 : isLatest ? 6.5 : 4.5}
-                    fill={isActive || isLatest ? "var(--accent)" : "var(--surface-solid)"}
-                    stroke="var(--accent)"
-                    strokeWidth={3}
-                  />
-                )}
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={isActive ? 7.5 : isLatest ? 6.5 : 4.5}
+                  fill={isActive || isLatest ? "var(--accent)" : "var(--surface-solid)"}
+                  stroke="var(--accent)"
+                  strokeWidth={3}
+                />
 
                 {/* Highlight ring if active */}
                 {isActive ? (
@@ -324,26 +302,12 @@ export function PriceChart({
         </svg>
       </div>
 
-      {/* Differentiable Legend */}
+      {/* Legend */}
       <div className="chart-caption">
         <div style={{ display: "flex", gap: "14px", alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
             <i className="chart-legend-dot" /> Live scan
           </span>
-          {hasHistorical ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--muted)" }}>
-              <span
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  border: "1.5px dashed var(--accent)",
-                  display: "inline-block"
-                }}
-              />{" "}
-              Historical
-            </span>
-          ) : null}
           {mrp ? (
             <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "rgb(245, 158, 11)" }}>
               <span

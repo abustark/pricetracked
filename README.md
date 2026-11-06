@@ -83,6 +83,28 @@ The included `vercel.json` registers a cron job:
 
 Vercel Cron sends an HTTP `GET` request to the configured path in production. The schedule runs in UTC. Vercel Hobby projects are limited to daily cron jobs; on Pro you can change the schedule back to every 6 hours with `0 */6 * * *`.
 
+> **Scheduler constraint (Vercel Hobby):** this project runs on the free Hobby plan, which permits **daily cron only** (`0 0 * * *`). Scans therefore happen at most once per day in production regardless of the per-product `scanEveryHours` setting. Do not advertise a 6-hour cadence while on Hobby; the product default and UI copy must say 24h (see `AGENTS.md`). Only after upgrading to Pro may the schedule become `0 */6 * * *`.
+
+## Price History Provenance
+
+All statistics, charts and buy advice are computed from **genuine observations only** — samples with source `direct` or `proxy` written by real scans (`OBSERVED_SOURCES` in `lib/analytics.ts`). The former six-point synthetic baseline (sources `historical` / `mrp-baseline`, generated from MRP factors) was removed in `2.0.2`: it is no longer created, no longer displayed, and excluded from every statistic. A newly tracked product starts with exactly one real observation and an honest "Gathering baseline" advice state until more scans accumulate.
+
+Legacy synthetic rows in existing databases are removed with:
+
+```bash
+# 1. Dry run (default) — prints counts by source, deletes nothing
+node scripts/migrate-synthetic-history.mjs
+
+# 2. Execute — writes a JSON backup, deletes matching synthetic samples,
+#    unsets the retired historyBackfilled flags on affected products
+node scripts/migrate-synthetic-history.mjs --execute
+
+# 3. Rollback — re-inserts the backed-up documents (original _ids preserved)
+node scripts/migrate-synthetic-history.mjs --restore=backup-synthetic-history-<timestamp>.json
+```
+
+The script only deletes records whose `source` is `historical` or `mrp-baseline` (with a positive numeric price and a past `capturedAt`); `direct`/`proxy` observations are never touched. It is idempotent — re-running `--execute` after success deletes 0 documents. Requires `MONGODB_URI` (and optionally `MONGODB_DB`, default `price_tracker`).
+
 ## Scraping Notes
 
 Direct HTML fetching can be blocked by ecommerce anti-bot systems. The scanner is intentionally isolated in `lib/scanner.ts` so you can replace or enhance it without changing the UI or analytics.

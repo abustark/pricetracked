@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
-import { calculatePriceStats } from "@/lib/analytics";
+import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import type { PriceSampleDocument, ProductDocument } from "@/lib/types";
@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   const samples = await db
     .collection<PriceSampleDocument>("price_samples")
-    .find({ productId })
+    .find({ productId, source: { $in: [...OBSERVED_SOURCES] } })
     .sort({ capturedAt: 1 })
     .limit(1000)
     .toArray();

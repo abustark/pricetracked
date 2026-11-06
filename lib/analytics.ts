@@ -1,7 +1,29 @@
 import type { PriceSampleDocument, PriceStats } from "@/lib/types";
 
+/** Sources produced by real scans. Synthetic legacy sources are never analysed. */
+export const OBSERVED_SOURCES = ["direct", "proxy"] as const;
+
+export type ObservedSource = (typeof OBSERVED_SOURCES)[number];
+
+export type ObservedSample = PriceSampleDocument & { source: ObservedSource };
+
+export function isObservedSample(sample: PriceSampleDocument): sample is ObservedSample {
+  return (OBSERVED_SOURCES as readonly string[]).includes(sample.source);
+}
+
+/**
+ * Keep only genuine observations for analysis. Mixed currencies are never averaged
+ * together; samples matching the latest observed currency win.
+ */
+export function selectObservedSamples(samples: PriceSampleDocument[]): ObservedSample[] {
+  const observed = samples.filter(isObservedSample);
+  if (observed.length <= 1) return observed;
+  const latestCurrency = observed[observed.length - 1].currency;
+  return observed.filter((sample) => sample.currency === latestCurrency);
+}
+
 export function calculatePriceStats(samples: PriceSampleDocument[], mrp?: number): PriceStats {
-  const sorted = [...samples].sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime());
+  const sorted = selectObservedSamples(samples).sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime());
 
   if (sorted.length === 0) {
     return {
@@ -103,10 +125,10 @@ function generateBuyAdvice({
   effectiveMrp,
   averageDays
 }: {
-  sorted: PriceSampleDocument[];
-  highest: PriceSampleDocument;
-  lowest: PriceSampleDocument;
-  current: PriceSampleDocument;
+  sorted: ObservedSample[];
+  highest: ObservedSample;
+  lowest: ObservedSample;
+  current: ObservedSample;
   commonPrice: number;
   effectiveMrp?: number;
   averageDays?: number;

@@ -26,3 +26,9 @@ These rules are mandatory for any AI agent working in this repository.
 2. Update files / write code / fix bugs as asked.
 3. Commit and push significant changes (rule 5); optionally offer — in the response text — to run or test them.
 4. Stop and wait for the user's acknowledgment before running anything.
+
+## Scheduler & Vercel Hobby Constraint (read before touching scan cadence)
+
+- This project is deployed on **Vercel Hobby**, which allows **daily cron only** (`0 0 * * *` in `vercel.json`).
+- Production scans run at most **once per day**, regardless of the per-product `scanEveryHours` value. Never advertise or implement a 6-hour cadence while on Hobby; UI copy and defaults must reflect 24h until the plan is upgraded to Pro (then `0 */6 * * *` may be used and documented).
+- Price history statistics must use genuine observations only (`direct` / `proxy` — see `OBSERVED_SOURCES` in `lib/analytics.ts`). Never reintroduce synthetic or generated price history; the generator and its data were removed in `2.0.2` (see `scripts/migrate-synthetic-history.mjs`).

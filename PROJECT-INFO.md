@@ -57,7 +57,7 @@
 - **Guest-first with claim:** signed-out visitors get an httpOnly `pricetracked-guest-id` UUID cookie (180d) via `getOrCreateViewer`; lists are guest-scoped with a sync banner. On sign-in `claimGuestProducts` moves guest products to the Google `userId`, merging duplicates by `normalizedUrl` and re-pointing samples; home shows `Saved N products…` notice.
 - **Scanner isolated:** `lib/scanner.ts` (621 lines) does direct fetch (Chrome/125 UA, 18s timeout, 3 attempts) then optional `SCRAPER_PROXY_*` render fallback; parse order JSON-LD → OG price meta → store-specific regex (Flipkart/Amazon/Myntra/AJIO selectors) → generic `data-price/data-testid/commerce JSON`; MRP variants, currency normalisation (`₹→INR`), stock detection, blocked-page (<50KB + captcha/robot) and SSRF guards. Replaceable without touching UI/analytics.
 - **Cron scans due products:** `GET /api/cron/scan` (requires `CRON_SECRET` via query/header/Bearer) scans ≤20 due (`active && nextScanAt<=now`, `scanEveryHours` default 6) via `scanDueProducts`, updating `nextScanAt` and `lastError` on failure.
-- **Instant-chart backfill:** first scan queues a FIFO backfill (1.5s) inserting a 6-point `mrp-baseline/historical` synthesis (90/65/45/30/14/3d) so charts render before real history accumulates.
+- **Genuine history only:** price statistics, charts and buy advice use only real observations (`direct`/`proxy` — `OBSERVED_SOURCES` in `lib/analytics.ts`). The former synthetic 6-point backfill (`mrp-baseline`/`historical`) was removed in `2.0.2`; new products start with one real scan and an honest "Gathering baseline" state, and `scripts/migrate-synthetic-history.mjs` removes legacy synthetic rows (dry-run → backup → delete).
 
 ---
 
@@ -96,7 +96,7 @@
 - **15 components** (server + client split), **9 lib modules**, **7 pages** (`/`, `/products/[id]`, `/how-it-works`, `/privacy`, `/terms`, `/auth/google/callback` + loading/not-found/OG-image).
 - **2 collections, 5 indexes** (`{userId,normalizedUrl}` unique, `{active,nextScanAt}`, `{userId,updatedAt}`, `price_samples {productId,capturedAt}` + `{productId,price}`).
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
-- **6 price samples** synthesised per new product for instant charts; up to **1,000 samples** loaded per detail page, last **12** shown.
+- Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown.
 - **60 commits** on `main`.
 
 ---
@@ -107,7 +107,7 @@
 - Per-user isolation — unique compound index + scoped queries, fail-closed `notFound` on cross-user access.
 - Secret hygiene — `CRON_SECRET` gate with non-prod bypass only when unset; error sanitiser masks DB/auth secrets.
 - SSRF + redirect safety — private-host blocklist, ≤5-hop safe-redirect enforcement, URL canonicalisation.
-- Degradation by design — proxy fallback, blocked-page detection, backfill synthesis, `Sign-in setup` state instead of broken avatar.
+- Degradation by design — proxy fallback, blocked-page detection, "Gathering baseline" first-scan state, `Sign-in setup` state instead of broken avatar.
 - Single-query discipline — detail loads product + 1,000 samples in two scoped reads; dashboard lists 50 with ISO-serialised dates.
 - Keyboard + ARIA chart — pointer + keyboard inspection, live regions, labelled controls, 44px targets.
 - Trunk-based Git workflow; AI-assisted development governed by in-repo agent rules (`AGENTS.md`).

@@ -1,6 +1,5 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { queueHistoricalBackfill } from "@/lib/history";
 import { assertAllowedProductUrl, canonicalizeStoreUrl, detectStore, getStoreLabel, resolveSupportedProductUrl } from "@/lib/stores";
 import type { PriceSampleDocument, ProductDocument, ScanResult, StoreKey } from "@/lib/types";
 
@@ -126,18 +125,6 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
     capturedAt: now,
     createdAt: now
   });
-
-  // If this product was tracked for the first time and hasn't been backfilled, queue historical backfill
-  if (!existing || !existing.historyBackfilled) {
-    queueHistoricalBackfill({
-      productId,
-      canonicalUrl,
-      store,
-      currentPrice: snapshot.price,
-      mrp: snapshot.mrp,
-      currency: snapshot.currency
-    });
-  }
 
   return {
     _id: productId,
