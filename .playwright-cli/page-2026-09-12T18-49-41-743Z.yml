@@ -3,9 +3,9 @@
     - /url: "#main-content"
   - main [ref=e3]:
     - generic [ref=e4]:
-      - link "PriceTrail home" [ref=e5] [cursor=pointer]:
+      - link "PriceTracked home" [ref=e5] [cursor=pointer]:
         - /url: /
-        - generic [ref=e10]: PriceTrail
+        - generic [ref=e10]: PriceTracked
       - navigation "Main navigation" [ref=e11]:
         - link "Watchlist" [ref=e12] [cursor=pointer]:
           - /url: "#watchlist"
@@ -57,5 +57,5 @@
         - link "Add a product ↑" [ref=e84] [cursor=pointer]:
           - /url: "#main-content"
     - generic [ref=e85]:
-      - paragraph [ref=e86]: © 2026 PriceTrail
+      - paragraph [ref=e86]: © 2026 PriceTracked
       - paragraph [ref=e87]: Price data is informational. Always confirm the final price at checkout.

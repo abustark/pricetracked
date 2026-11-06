@@ -20,9 +20,9 @@ export default async function Home() {
   return (
     <main className="shell home-shell" id="main-content">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <nav className="main-nav" aria-label="Main navigation">
           <Link href="/how-it-works">How it works</Link>

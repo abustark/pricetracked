@@ -9,20 +9,20 @@ const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", dis
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://price-trail-ruddy.vercel.app"),
-  title: "PriceTrail - buy at the right time",
+  metadataBase: new URL("https://pricetracked.vercel.app"),
+  title: "PriceTracked - buy at the right time",
   description:
     "Track product prices across Amazon, Flipkart, Myntra, AJIO and the wider web with a lightweight price history.",
   openGraph: {
-    title: "PriceTrail - buy at the right time",
+    title: "PriceTracked - buy at the right time",
     description:
       "Price history for online shopping. Paste a product link to see where its price has been before you buy.",
-    siteName: "PriceTrail",
+    siteName: "PriceTracked",
     type: "website"
   },
   twitter: {
     card: "summary_large_image",
-    title: "PriceTrail - buy at the right time",
+    title: "PriceTracked - buy at the right time",
     description:
       "Price history for online shopping. Paste a product link to see where its price has been before you buy."
   }
@@ -49,7 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var theme = localStorage.getItem("pricetrail-theme");
+                var theme = localStorage.getItem("pricetracked-theme");
                 var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
                 document.documentElement.dataset.theme = theme || (prefersDark ? "dark" : "light");
               } catch (_) {}

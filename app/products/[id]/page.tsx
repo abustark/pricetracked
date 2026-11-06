@@ -50,9 +50,9 @@ export default async function ProductPage({ params }: Props) {
   return (
     <main className="shell" id="main-content">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <div className="top-actions">
           <AuthButton session={viewer.session} />

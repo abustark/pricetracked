@@ -1,8 +1,8 @@
-# PriceTrail: Comprehensive Performance and Design UI/UX Audit Report
+# PriceTracked: Comprehensive Performance and Design UI/UX Audit Report
 
 ## Executive Summary
 
-This audit evaluates **PriceTrail** across performance benchmarks, visual design, user experience (UX), accessibility (WCAG 2.1 AA guidelines), and form interaction states.
+This audit evaluates **PriceTracked** across performance benchmarks, visual design, user experience (UX), accessibility (WCAG 2.1 AA guidelines), and form interaction states.
 
 The application exhibits **excellent loading performance** with lightweight client-side assets and minimal DOM footprint (~130 nodes). The visual design system features a modern neo-brutalist / glassmorphism aesthetic with polished micro-interactions and dark/light theme support.
 

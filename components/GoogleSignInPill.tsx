@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "waiting" | "saving";
 
-const MESSAGE_SOURCE = "pricetrail-google-auth";
+const MESSAGE_SOURCE = "pricetracked-google-auth";
 
 export function GoogleSignInPill({ clientId }: { clientId: string }) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -98,7 +98,7 @@ export function GoogleSignInPill({ clientId }: { clientId: string }) {
 
     const popup = window.open(
       authUrl,
-      "pricetrail-google-signin",
+      "pricetracked-google-signin",
       "popup=yes,width=520,height=620"
     );
 

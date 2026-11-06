@@ -13,7 +13,7 @@ export type DropItem = {
 
 /** Rotation window: same 3 drops per browser for 6h from first open. */
 export const DROPS_WINDOW_MS = 6 * 60 * 60 * 1000;
-export const DROPS_COOKIE = "pricetrail-drops";
+export const DROPS_COOKIE = "pricetracked-drops";
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_TRIES = 5;

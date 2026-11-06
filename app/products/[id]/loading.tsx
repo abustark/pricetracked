@@ -7,7 +7,7 @@ export default function ProductLoading() {
       <header className="topbar">
         <Link className="brand" href="/">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
       </header>
 

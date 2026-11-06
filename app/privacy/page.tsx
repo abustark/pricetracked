@@ -5,8 +5,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BackButton } from "@/components/BackButton";
 
 export const metadata: Metadata = {
-  title: "Privacy - PriceTrail",
-  description: "What PriceTrail stores, in plain terms."
+  title: "Privacy - PriceTracked",
+  description: "What PriceTracked stores, in plain terms."
 };
 
 export default function PrivacyPage() {
@@ -14,9 +14,9 @@ export default function PrivacyPage() {
     <main className="shell" id="main-content">
       <BackButton />
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <nav className="main-nav" aria-label="Main navigation">
           <Link href="/#watchlist">Watchlist</Link>
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
         <ul>
           <li>No selling personal data to advertisers.</li>
           <li>No tracking cookies beyond Google sign-in.</li>
-          <li>No payment data — PriceTrail doesn&apos;t process payments.</li>
+          <li>No payment data — PriceTracked doesn&apos;t process payments.</li>
         </ul>
 
         <h2>Price data</h2>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
         <p>
           Delete your products to clear your watchlist. For full data removal, reach out through
           the project&apos;s{" "}
-          <a href="https://github.com/abustark/price-trail" target="_blank" rel="noreferrer">
+          <a href="https://github.com/abustark/pricetracked" target="_blank" rel="noreferrer">
             GitHub repository
           </a>
           .

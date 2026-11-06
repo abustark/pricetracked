@@ -1,6 +1,6 @@
-# Antigravity execution prompt for PriceTrail
+# Antigravity execution prompt for PriceTracked
 
-You are working on the existing `abustark/price-trail` repository.
+You are working on the existing `abustark/pricetracked` repository.
 
 ## Mission
 
@@ -10,9 +10,9 @@ This is an existing product. Improve it carefully instead of rebuilding it from 
 
 ## Repository and branch rules
 
-- Repository: `https://github.com/abustark/price-trail`
-- Required branch: `arena/01a030cf-price-trail`
-- Work only on `arena/01a030cf-price-trail`.
+- Repository: `https://github.com/abustark/pricetracked`
+- Required branch: `arena/01a030cf-pricetracked`
+- Work only on `arena/01a030cf-pricetracked`.
 - Do not switch to `main` for implementation.
 - Do not create another branch.
 - Do not push to `main`.
@@ -21,7 +21,7 @@ This is an existing product. Improve it carefully instead of rebuilding it from 
 - Push only the final tested result to:
 
 ```bash
-git push origin arena/01a030cf-price-trail
+git push origin arena/01a030cf-pricetracked
 ```
 
 Before changing anything, run:
@@ -62,7 +62,7 @@ Use the relevant installed skills as review and implementation lenses:
 
 Do not combine conflicting aesthetics blindly. Use one coherent direction:
 
-> Calm, premium, minimalist consumer utility UI with Apple-style restraint, PriceTrail teal branding, and ecommerce product clarity.
+> Calm, premium, minimalist consumer utility UI with Apple-style restraint, PriceTracked teal branding, and ecommerce product clarity.
 
 Use `prototype` only for isolated high-impact component variants, such as the account menu. Do not create multiple competing full homepage designs inside production code.
 
@@ -221,14 +221,14 @@ These may point to the Production domain. The application already uses `trustHos
 The Google OAuth callback for the Preview deployment must be registered in Google Cloud Console:
 
 ```text
-https://price-trail-7p2fx7grr-abustarks-projects.vercel.app/api/auth/callback/google
+https://pricetracked-7p2fx7grr-abustarks-projects.vercel.app/api/auth/callback/google
 ```
 
 After variables are correctly configured, redeploy Preview and verify that:
 
 - `Sign in` is visible
 - Clicking it opens Google OAuth
-- Callback returns to PriceTrail
+- Callback returns to PriceTracked
 - The authenticated avatar appears
 - The account menu opens
 - Sign out works
@@ -250,7 +250,7 @@ Brand        navigation              avatar / name / theme
 Mobile:
 
 ```text
-PriceTrail                                  avatar / theme
+PriceTracked                                  avatar / theme
 ```
 
 Requirements:
@@ -575,8 +575,8 @@ Only after the full implementation and audit are complete:
 
 ```bash
 git add <intended-files>
-git commit -m "Complete PriceTrail UX and reliability improvements"
-git push origin arena/01a030cf-price-trail
+git commit -m "Complete PriceTracked UX and reliability improvements"
+git push origin arena/01a030cf-pricetracked
 ```
 
 After pushing, report:

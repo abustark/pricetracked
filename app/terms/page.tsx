@@ -5,8 +5,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BackButton } from "@/components/BackButton";
 
 export const metadata: Metadata = {
-  title: "Terms - PriceTrail",
-  description: "The terms of using PriceTrail and its informational price data."
+  title: "Terms - PriceTracked",
+  description: "The terms of using PriceTracked and its informational price data."
 };
 
 export default function TermsPage() {
@@ -14,9 +14,9 @@ export default function TermsPage() {
     <main className="shell" id="main-content">
       <BackButton />
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <nav className="main-nav" aria-label="Main navigation">
           <Link href="/#watchlist">Watchlist</Link>
@@ -28,7 +28,7 @@ export default function TermsPage() {
         <h1>Terms</h1>
         <p className="legal-updated">Last updated 23 September 2026</p>
 
-        <p>By using PriceTrail, you agree to these terms.</p>
+        <p>By using PriceTracked, you agree to these terms.</p>
 
         <h2>Use of the service</h2>
         <ul>
@@ -53,7 +53,7 @@ export default function TermsPage() {
         <h2>Contact</h2>
         <p>
           Reach out through the project&apos;s{" "}
-          <a href="https://github.com/abustark/price-trail" target="_blank" rel="noreferrer">
+          <a href="https://github.com/abustark/pricetracked" target="_blank" rel="noreferrer">
             GitHub repository
           </a>
           .

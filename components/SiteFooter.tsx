@@ -5,9 +5,9 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="footer-brand">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <p>Price history for online shopping — paste a link, see the trail, buy at the right time.</p>
       </div>
@@ -35,7 +35,7 @@ export function SiteFooter() {
 
       <div className="footer-base">
         <div className="footer-base-copy">
-          <p>© 2026 PriceTrail</p>
+          <p>© 2026 PriceTracked</p>
           <p>Price data is informational. Always confirm the final price at checkout.</p>
         </div>
         <a

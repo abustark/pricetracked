@@ -6,9 +6,9 @@ export default function NotFound() {
   return (
     <main className="shell" id="main-content">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
       </header>
 

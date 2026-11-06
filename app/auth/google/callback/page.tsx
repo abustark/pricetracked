@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-const MESSAGE_SOURCE = "pricetrail-google-auth";
+const MESSAGE_SOURCE = "pricetracked-google-auth";
 
 /**
  * Landing page for Google's popup window. Grabs ?code&state from the URL

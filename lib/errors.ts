@@ -10,7 +10,7 @@ export function sanitizeErrorMessage(error: unknown, fallback = "Service tempora
 
   // Explicitly check for internal/system configurations or connection failures
   if (
-    /MONGODB|DATABASE|MONGO|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|AUTH_SECRET|CLIENT_SECRET|PRICETRAIL_|ENV_/i.test(normalized) ||
+    /MONGODB|DATABASE|MONGO|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|AUTH_SECRET|CLIENT_SECRET|PRICETRACKED_|ENV_/i.test(normalized) ||
     /failed to connect|connection string|server selection|topology closed|authentication failed/i.test(normalized)
   ) {
     return "Service temporarily unavailable. Please try again later.";

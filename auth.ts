@@ -15,7 +15,7 @@ const providers = hasGoogleCredentials
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   // Keep local preview noise-free while still requiring a real secret in production.
-  secret: process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? undefined : "pricetrail-local-development-secret"),
+  secret: process.env.AUTH_SECRET || (process.env.NODE_ENV === "production" ? undefined : "pricetracked-local-development-secret"),
   providers,
   session: {
     strategy: "jwt"

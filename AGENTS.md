@@ -1,4 +1,4 @@
-# AGENTS.md — Agent Instructions for PriceTrail
+# AGENTS.md — Agent Instructions for PriceTracked
 
 These rules are mandatory for any AI agent working in this repository.
 
@@ -10,8 +10,8 @@ These rules are mandatory for any AI agent working in this repository.
 
 3. **Remind, don't run.** In its response, the AI may remind the user that running or testing the new updates is available. It must only actually run them after the user acknowledges or explicitly proceeds with it.
 
-4. **Save images to the project folder.** Any screenshot, crop, capture, or other image produced while working on this project must also be saved to `D:\projects\price-trail\artifacts\` (in addition to the working temp folder on C:). Keep file names descriptive (e.g. `final-light-desktop.png`).
-5. **Commit and push every big change.** Significant work (features, redesigns, multi-file edits, rule updates) must be committed and pushed to `origin/main` as part of finishing it — and fast-forwarded onto `arena/01a030cf-price-trail` so both branches stay identical — without waiting for an explicit request. Only trivial typo-level tweaks may be batched into the next commit.
+4. **Save images to the project folder.** Any screenshot, crop, capture, or other image produced while working on this project must also be saved to `D:\projects\pricetracked\artifacts\` (in addition to the working temp folder on C:). Keep file names descriptive (e.g. `final-light-desktop.png`).
+5. **Commit and push every big change.** Significant work (features, redesigns, multi-file edits, rule updates) must be committed and pushed to `origin/main` as part of finishing it — and fast-forwarded onto `arena/01a030cf-pricetracked` so both branches stay identical — without waiting for an explicit request. Only trivial typo-level tweaks may be batched into the next commit.
 
 ## Commit Naming & Versioning (strict)
 

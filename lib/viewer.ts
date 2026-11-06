@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 import { getDb } from "@/lib/db";
 import type { ProductDocument } from "@/lib/types";
 
-export const GUEST_COOKIE = "pricetrail-guest-id";
+export const GUEST_COOKIE = "pricetracked-guest-id";
 const GUEST_COOKIE_MAX_AGE = 60 * 60 * 24 * 180;
 const GUEST_ID_PATTERN = /^[0-9a-f-]{36}$/i;
 

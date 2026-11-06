@@ -5,8 +5,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BackButton } from "@/components/BackButton";
 
 export const metadata: Metadata = {
-  title: "How it works - PriceTrail",
-  description: "Three steps to a better buy — and every price insight PriceTrail tracks."
+  title: "How it works - PriceTracked",
+  description: "Three steps to a better buy — and every price insight PriceTracked tracks."
 };
 
 export default function HowItWorksPage() {
@@ -14,9 +14,9 @@ export default function HowItWorksPage() {
     <main className="shell" id="main-content">
       <BackButton />
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTrail home">
+        <Link className="brand" href="/" aria-label="PriceTracked home">
           <LogoMark />
-          <span>PriceTrail</span>
+          <span>PriceTracked</span>
         </Link>
         <nav className="main-nav" aria-label="Main navigation">
           <Link href="/#watchlist">Watchlist</Link>

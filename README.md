@@ -1,11 +1,11 @@
-# PriceTrail
+# PriceTracked
 
 > 📄 **[`PROJECT-INFO.md`](PROJECT-INFO.md)** — machine-readable project facts (stack + exact versions, architecture, metrics, keyword tags) designed so an AI can generate resume entries and portfolio project summaries from it alone.
 
-> **Live demo:** https://price-trail-ruddy.vercel.app/
-> **Repo:** https://github.com/abustark/price-trail
+> **Live demo:** https://pricetracked.vercel.app/
+> **Repo:** https://github.com/abustark/pricetracked
 
-PriceTrail is a Vercel-ready ecommerce price tracker with a fast, focused watchlist UI. It has dedicated extraction paths for Amazon India, Flipkart, Myntra and AJIO, plus a generic structured-data adapter for product pages across the wider web.
+PriceTracked is a Vercel-ready ecommerce price tracker with a fast, focused watchlist UI. It has dedicated extraction paths for Amazon India, Flipkart, Myntra and AJIO, plus a generic structured-data adapter for product pages across the wider web.
 
 Paste one product URL to record price snapshots over time and report:
 
@@ -49,7 +49,7 @@ Open `http://localhost:3010`, paste a product URL, and the app will scan and sav
 
 ## Google Sign In
 
-PriceTrail uses Auth.js/NextAuth Google OAuth so tracked product links are saved to the signed-in user and available across devices.
+PriceTracked uses Auth.js/NextAuth Google OAuth so tracked product links are saved to the signed-in user and available across devices.
 
 Create OAuth credentials in Google Cloud Console and add this redirect URI:
 

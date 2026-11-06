@@ -16,7 +16,7 @@ export function ThemeToggle() {
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    localStorage.setItem("pricetrail-theme", next);
+    localStorage.setItem("pricetracked-theme", next);
     setTheme(next);
   }
 

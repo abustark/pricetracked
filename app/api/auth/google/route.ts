@@ -18,7 +18,7 @@ const POPUP_REDIRECT_PATH = "/auth/google/callback";
 function resolveAuthSecret(): string {
   const secret =
     process.env.AUTH_SECRET ||
-    (process.env.NODE_ENV === "production" ? undefined : "pricetrail-local-development-secret");
+    (process.env.NODE_ENV === "production" ? undefined : "pricetracked-local-development-secret");
   if (!secret) throw new Error("AUTH_SECRET is not configured.");
   return secret;
 }
