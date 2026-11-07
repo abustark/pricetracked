@@ -1,5 +1,11 @@
 # Antigravity execution prompt for PriceTracked
 
+> **Historical design/execution brief — not the current agent workflow.** This
+> file records the original Arena prompt used for the visual and bug-fix pass.
+> Current repository rules (branch mirroring, commit versioning, gates only on
+> request) live in `AGENTS.md` and take precedence. Product behaviour documents
+> are `README.md` and `PROJECT-INFO.md`.
+
 You are working on the existing `abustark/pricetracked` repository.
 
 ## Mission

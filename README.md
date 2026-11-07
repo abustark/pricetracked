@@ -21,9 +21,11 @@ The generic adapter first looks for schema.org Product/Offer JSON-LD, then Open 
 ## Tech Stack
 
 - Next.js App Router
-- MongoDB Atlas
-- Vercel Functions
-- Vercel Cron Jobs
+- React 19 + TypeScript
+- MongoDB Atlas (raw driver)
+- Auth.js / NextAuth (Google)
+- Vercel Functions + Vercel Cron Jobs
+- Vitest unit tests + GitHub Actions CI
 
 ## Local Setup
 
@@ -44,6 +46,8 @@ AUTH_URL=http://localhost:3010
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 ```
+
+Optional tuning variables (see `.env.example`): `CRON_SCAN_LIMIT` (products per cron run, default 10, max 50), `CRON_TIME_BUDGET_MS` (cron wall-clock budget, default 45,000, max 300,000) and the `SCRAPER_PROXY_*` provider settings documented under [Scraping Notes](#scraping-notes).
 
 Open `http://localhost:3010`, paste a product URL, and the app will scan and save the first price sample. Signed-out visitors keep a private watchlist in their browser; sign in with Google before tracking if you need access across devices.
 
@@ -177,7 +181,7 @@ SCRAPER_PROXY_TOKEN=your-api-key
 
 ## API
 
-Create or rescan a tracked product:
+Track a product:
 
 ```http
 POST /api/products
@@ -198,10 +202,29 @@ Get detail, samples and stats:
 GET /api/products/:id
 ```
 
+Update target price / alert state, or delete the product:
+
+```http
+PATCH  /api/products/:id   # {"targetPrice": 12999, "targetAlertEnabled": true}
+DELETE /api/products/:id
+```
+
 Manual rescan:
 
 ```http
 POST /api/products/:id/scan
+```
+
+Clear observed history (then rescan rebuilds it):
+
+```http
+DELETE /api/products/:id/samples
+```
+
+Recent-drops tape:
+
+```http
+GET /api/recent-drops
 ```
 
 Cron scan:

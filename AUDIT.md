@@ -1,5 +1,21 @@
 # PriceTracked: Comprehensive Performance and Design UI/UX Audit Report
 
+> **Status of this audit (re-verified 2026-11-07 against `2.0.6`):** this is a
+> point-in-time report from the original review, kept for history. The three
+> headline findings were re-checked against the current source:
+> 1. **Light-mode muted text** — now `--muted: #5d574a` on `#f7f4ec`
+>    (≈6.5:1), which passes WCAG AA. The old `#71807c` value no longer exists.
+> 2. **Header tap targets** — `.main-nav a` and the theme/auth controls already
+>    have `min-height: 44px`.
+> 3. **Error masking** — `sanitizeErrorMessage()` is applied by the API routes
+>    and forms, so DB/env details are no longer surfaced.
+>
+> Two genuine gaps were found and fixed in `2.0.5`: form errors are now
+> associated with their inputs (`aria-invalid` + `aria-describedby`), and a
+> failed watchlist load now shows a service-unavailable notice instead of an
+> empty list. Legacy typography/benchmark details below may not match the
+> current design tokens.
+
 ## Executive Summary
 
 This audit evaluates **PriceTracked** across performance benchmarks, visual design, user experience (UX), accessibility (WCAG 2.1 AA guidelines), and form interaction states.

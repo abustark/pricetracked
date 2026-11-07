@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.6`** (current head is `2.0.5` — see below)
+> - **`main` → `2.0.7`** (current head is `2.0.6` — see below)
 
 ---
 
@@ -110,4 +110,16 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `app/page.tsx` + `app/globals.css`: watchlist load failures show an honest `service-notice` ("your saved products are safe") instead of silently rendering an empty list; `loadProducts` returns `{products, failed}`.
   - `.github/workflows/ci.yml` (new): `npm ci` → lint → typecheck → `npm test` → build on push/PR (CI-only placeholder env, no real services).
   - `README.md`: new "Testing" and "Observability" sections, `/api/health` endpoint; `PROJECT-INFO.md`: test framework/CI facts. Test execution was intentionally deferred until the owner approves running gates.
+
+### 2.0.6 - reconcile documentation with the shipped 2.0.x behaviour
+
+- **Date**: 2026-11-07
+- **Why**: owner request — the docs still described pre-P1/P3 behaviour (≤20 products per cron run, 6h defaults, "no test framework"), which contradicted the code after `2.0.2`–`2.0.5`.
+- **Changes**:
+  - `PROJECT-INFO.md`: full reconciliation against the current source — 68 commits, 100 tracked files, ~6,895 TS/TSX/CSS lines, 16 components, 13 lib modules, 6 pages, 10 API paths / 16 handlers, 3 collections / 7 indexes, 11 Vitest suites + GitHub Actions; architecture now documents the daily 24h cadence, bounded cron batch (default 10 / max 50, 45s budget), atomic scan claims + 5-minute stale-lock TTL, in-app alerts, structured logs, `/api/health`, DNS-aware SSRF guards and the a11y/error states. Resume examples corrected (`≤20 per run` → 10/50 bound) and no longer claim gates have passed.
+  - `README.md`: tech stack lists React 19/TypeScript, Auth.js, Vitest and GitHub Actions; optional `CRON_SCAN_LIMIT`/`CRON_TIME_BUDGET_MS`/proxy env tuning documented; API section now covers track (POST), list, detail, PATCH/DELETE product, manual rescan, history reset (`DELETE /api/products/:id/samples`), recent drops and `/api/health`; "create or rescan" wording corrected.
+  - `.env.example`: added `CRON_TIME_BUDGET_MS` alongside `CRON_SCAN_LIMIT`.
+  - `AUDIT.md`: added a re-verification status block — point-in-time report; light `--muted` is now `#5d574a` (≈6.5:1, AA pass), nav/theme controls already 44px, errors already sanitised; the two genuine gaps (form-error association, watchlist load failure) were fixed in `2.0.5`; legacy typography/benchmark details may be stale.
+  - No runtime code changed in this commit; tests were still not executed (owner approval pending).
+
 
