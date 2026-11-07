@@ -7,7 +7,9 @@ export type ObservedSource = (typeof OBSERVED_SOURCES)[number];
 
 export type ObservedSample = PriceSampleDocument & { source: ObservedSource };
 
-export function isObservedSample(sample: PriceSampleDocument): sample is ObservedSample {
+export function isObservedSample<T extends PriceSampleDocument>(
+  sample: T
+): sample is T & { source: ObservedSource } {
   return (OBSERVED_SOURCES as readonly string[]).includes(sample.source);
 }
 

@@ -18,7 +18,7 @@ export type ProductDocument = {
   nextScanAt: Date;
   lastScannedAt?: Date;
   lastAttemptAt?: Date;
-  scanLockUntil?: Date;
+  scanLockUntil?: Date | null;
   scanStartedAt?: Date;
   failureCount?: number;
   lastPrice?: number;

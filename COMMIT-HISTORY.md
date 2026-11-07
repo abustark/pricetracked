@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.9`** (current head is `2.0.8` — see below)
+> - **`main` → `2.0.10`** (current head is `2.0.9` — see below)
 
 ---
 
@@ -142,5 +142,20 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - Deleted `AUDIT.md`, all 6 files in `artifacts/` and `start-ai.bat` — 8 tracked files total, none referenced by app code, tests or CI (remaining `*.md` references are historical `COMMIT-HISTORY.md` entries only).
   - `PROJECT-INFO.md`: reconciled to `2.0.8` — 81 tracked files, 70 commits; Visual QA artifacts line and `AUDIT.md` docs reference removed. Note: repo rule 4 still requires any future screenshots to be saved under `artifacts/` (the folder will be recreated on demand).
   - No runtime code, tests or config changed.
+
+### 2.0.9 - drop screenshot rule, run all test gates green
+
+- **Date**: 2026-11-07
+- **Why**: owner request — delete the `artifacts/` screenshot rule from `AGENTS.md` (screenshots are for the agent to view and verify, then delete — the owner doesn't need them saved), then run all test gates, which had never been executed since `2.0.5`.
+- **Changes**:
+  - `AGENTS.md`: rule 4 (save every screenshot under `artifacts/`) deleted; Commit-and-push is now rule 4, Order-of-Operations reference updated.
+  - Gate fixes (all caught only because gates finally ran — none of these had ever been exercised):
+    - `tests/stores.test.ts`: added missing `describe("URL normalisation")` opener — the file shipped in `2.0.5` with a syntax error (orphan `});`).
+    - `lib/types.ts`: `scanLockUntil?: Date` widened to `Date | null` — `claimProductScan`'s `$or` filter explicitly matches null locks.
+    - `lib/analytics.ts`: `isObservedSample` is now generic (`<T extends PriceSampleDocument>(sample: T): sample is T & { source: ObservedSource }`) so `filter()` narrows driver `WithId<T>` arrays too.
+    - `app/products/[id]/page.tsx`: chart input filtered through `isObservedSample` (runtime-identical — the query already restricts to observed sources — and now type-correct).
+    - `lib/stores.ts`: `isSafePublicHostname` reordered — dotted-quad IPv4 literals (e.g. `8.8.8.8`) now reach `isSafePublicIpv4` instead of being rejected by the pure-numeric check first (the classifier was dead code for decimal quads); single-integer hex (`0x7f000001`) now fails closed per the function's own doc comment. This fixes the DNS-accept path for hosts resolving to public IPs.
+  - Gate results (first full run): `tsc --noEmit` clean, Vitest **11 files / 113 tests passed**, ESLint clean, `next build` compiled with 12 static pages. Local `node_modules` had stripped type declarations (`mongodb`, `@auth/core`); restored with `npm ci` (same lockfile, no dependency changes, 12 audit findings untouched).
+  - `PROJECT-INFO.md`: reconciled to `2.0.9` — 71 commits.
 
 

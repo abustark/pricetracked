@@ -173,11 +173,14 @@ export function isSafePublicHostname(hostname: string): boolean {
   // and a raw hostname can still contain colons).
   if (value.includes(":")) return isSafePublicIpv6(value);
 
-  // A public store hostname always contains a letter. Pure-numeric hosts
-  // (decimal/hex single-integer IPv4 forms) are rejected outright.
-  if (!/[a-z]/.test(value)) return false;
-
+  // Dotted-quad IPv4 literal (incl. hex/octal octet encodings, e.g.
+  // 8.8.8.8 or 0x7f.0.0.1) — classify it properly.
   if (isIpv4Like(value)) return isSafePublicIpv4(value);
+
+  // Any other purely numeric host — decimal/hex single-integer encodings
+  // (2130706433, 0x7f000001) or short 1–3-part numeric forms — is never a
+  // store hostname. A public store hostname always contains a letter.
+  if (/^0x[0-9a-f]+$/.test(value) || !/[a-z]/.test(value)) return false;
 
   return true;
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ObjectId } from "mongodb";
 import { notFound } from "next/navigation";
-import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
+import { calculatePriceStats, isObservedSample, OBSERVED_SOURCES } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
 import { getEffectiveScanEveryHours } from "@/lib/schedule";
 import { getViewer } from "@/lib/viewer";
@@ -135,11 +135,13 @@ export default async function ProductPage({ params }: Props) {
         <div className="panel">
           <h2>Price history</h2>
           <PriceChart
-            samples={samples.map((sample) => ({
-              price: sample.price,
-              capturedAt: sample.capturedAt.toISOString(),
-              source: sample.source
-            }))}
+            samples={samples
+              .filter(isObservedSample)
+              .map((sample) => ({
+                price: sample.price,
+                capturedAt: sample.capturedAt.toISOString(),
+                source: sample.source
+              }))}
             currency={product.currency}
             mrp={product.mrp}
           />

@@ -6,7 +6,7 @@
 > and tone to the target (resume = dense & quantified; portfolio = readable &
 > story-driven).
 >
-> **Last reconciled with the code:** `2.0.8` (2026-11-07).
+> **Last reconciled with the code:** `2.0.9` (2026-11-07).
 
 ---
 
@@ -20,7 +20,7 @@
 | Live site | https://pricetracked.vercel.app |
 | Source | https://github.com/abustark/pricetracked |
 | License | None declared (private) |
-| Status | Production-deployed on Vercel, actively maintained (2026, 70 commits) |
+| Status | Production-deployed on Vercel, actively maintained (2026, 71 commits) |
 
 **One-liners (pick by context):**
 - *10 words:* Ecommerce price tracker with Google sign-in, history charts, cron rescans.
@@ -50,7 +50,7 @@
 | Lint | ESLint | ^9.25.0 + `eslint-config-next` | `npm run lint` |
 | Tests | Vitest | ^5.1.0 | `npm test` — 11 unit suites, network/DNS/MongoDB mocked |
 | CI | GitHub Actions | `.github/workflows/ci.yml` | `npm ci` → lint → typecheck → test → build |
-| VCS | Git / GitHub | `main` + mirrored Arena branch | 70 commits, trunk-based |
+| VCS | Git / GitHub | `main` + mirrored Arena branch | 71 commits, trunk-based |
 
 ---
 
@@ -108,7 +108,7 @@
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
 - Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown in "Recent scans"; chart downsamples to **220** points.
 - Cron bounds: **10** products per run by default (**50** max) within a **45s** budget; **5-minute** stale-lock TTL.
-- **70 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
+- **71 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
 
 ---
 

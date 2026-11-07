@@ -158,6 +158,8 @@ describe("short-link resolution", () => {
     );
   });
 });
+
+describe("URL normalisation", () => {
   it("forces https and the canonical store host", () => {
     expect(canonicalizeStoreUrl("http://amazon.in/dp/X?tag=abc#frag", "amazon")).toBe(
       "https://www.amazon.in/dp/X?tag=abc"
