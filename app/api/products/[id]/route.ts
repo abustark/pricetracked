@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
+import { deleteAlertEventsForProduct } from "@/lib/alerts";
 import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
@@ -143,6 +144,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
 
   await db.collection<PriceSampleDocument>("price_samples").deleteMany({ productId });
+  await deleteAlertEventsForProduct(productId);
 
   return NextResponse.json({ ok: true });
 }

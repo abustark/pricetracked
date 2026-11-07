@@ -49,6 +49,11 @@ export async function ensureIndexes() {
     products.createIndex({ active: 1, nextScanAt: 1 }),
     products.createIndex({ userId: 1, updatedAt: -1 }),
     db.collection("price_samples").createIndex({ productId: 1, capturedAt: -1 }),
-    db.collection("price_samples").createIndex({ productId: 1, price: 1 })
+    db.collection("price_samples").createIndex({ productId: 1, price: 1 }),
+    db.collection("alert_events").createIndex({ userId: 1, observedAt: -1 }),
+    db.collection("alert_events").createIndex(
+      { productId: 1, target: 1, observedAt: 1 },
+      { unique: true }
+    )
   ]);
 }

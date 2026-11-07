@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
+import { createAlertEvent } from "@/lib/alerts";
 import {
   DEFAULT_SCAN_EVERY_HOURS,
   INTER_PRODUCT_DELAY_MS,
@@ -139,6 +140,31 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
     createdAt: now
   });
 
+  // Target-alert crossing detection. Fires only for an existing product, on a
+  // genuine successful observation (this code path always has a real price),
+  // when the alert is enabled, and the price crossed from above the target to
+  // at-or-below it. The persisted `targetPriceReached` transition state prevents
+  // duplicate events on subsequent below-target scans. A target created while
+  // the price is already below it never fires here — it is handled in the PATCH
+  // route with its own copy.
+  const prevReached = existing?.targetPriceReached === true;
+  const nowReached = productUpdate.targetPriceReached === true;
+  // Legacy products with a target but no flag are treated as enabled, matching
+  // the UI default; only an explicit `false` pauses alerts.
+  const crossedToTarget =
+    existing != null && nowReached && !prevReached && existing.targetAlertEnabled !== false;
+
+  if (crossedToTarget && existing.targetPrice != null) {
+    await createAlertEvent({
+      productId,
+      userId: existing.userId,
+      target: existing.targetPrice,
+      observedPrice: snapshot.price,
+      currency: snapshot.currency,
+      observedAt: now
+    });
+  }
+
   return {
     _id: productId,
     createdAt: existing?.createdAt || now,
@@ -182,7 +208,7 @@ export async function claimProductScan(
 }
 
 /** Release the scan lock and record the scan outcome. Never erases lastPrice. */
-async function releaseScanLock(
+export async function releaseScanLock(
   product: ProductDocument,
   outcome: { ok: boolean; error?: string },
   now = new Date()

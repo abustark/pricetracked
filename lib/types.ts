@@ -67,6 +67,34 @@ export type BuyAdvice = {
   potentialSavings?: number;
 };
 
+/** In-app target-price alert event. Created only when a genuine scan observes
+ * the price crossing from above the target to at-or-below it while the alert
+ * is enabled. In-app only — there is no email/push delivery. */
+export type AlertEventDocument = {
+  _id?: ObjectId;
+  productId: ObjectId;
+  userId: string;
+  target: number;
+  observedPrice: number;
+  currency: string;
+  observedAt: Date;
+  readAt?: Date;
+  createdAt: Date;
+};
+
+/** Serialized alert event for client components. */
+export type AlertEventView = {
+  id: string;
+  productId: string;
+  productTitle: string;
+  productStoreLabel?: string;
+  target: number;
+  observedPrice: number;
+  currency: string;
+  observedAt: string;
+  read: boolean;
+};
+
 export type PriceStats = {
   sampleCount: number;
   highest?: { price: number; capturedAt: string };

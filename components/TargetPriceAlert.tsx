@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icons";
 
@@ -26,6 +27,7 @@ export function TargetPriceAlert({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [targetPrice, setTargetPrice] = useState<number | null>(initialTargetPrice ?? null);
+  const [alertsEnabled, setAlertsEnabled] = useState<boolean>(initialTargetAlertEnabled);
   const [inputVal, setInputVal] = useState<string>(
     initialTargetPrice ? String(initialTargetPrice) : ""
   );
@@ -56,10 +58,22 @@ export function TargetPriceAlert({
         throw new Error("Failed to update target price");
       }
 
+      const payload = (await res.json().catch(() => null)) as
+        | { product?: { targetPriceReached?: boolean } | null }
+        | null;
+      const alreadyBelow = payload?.product?.targetPriceReached === true;
+
       setTargetPrice(priceToSave);
+      setAlertsEnabled(priceToSave ? true : alertsEnabled);
       setInputVal(priceToSave ? String(priceToSave) : "");
       setIsEditing(false);
-      setStatusMsg(priceToSave ? "Target price saved!" : "Target alert cleared.");
+      setStatusMsg(
+        priceToSave
+          ? alreadyBelow
+            ? "Target saved — the current price is already at or below it, so it shows as reached."
+            : "Target price saved!"
+          : "Target alert cleared."
+      );
       setTimeout(() => setStatusMsg(null), 3500);
 
       startTransition(() => {
@@ -67,6 +81,29 @@ export function TargetPriceAlert({
       });
     } catch {
       setStatusMsg("Error updating target. Please try again.");
+    }
+  };
+
+  const handleToggleEnabled = async () => {
+    const nextEnabled = !alertsEnabled;
+    setStatusMsg(null);
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetAlertEnabled: nextEnabled })
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update alert state");
+      }
+      setAlertsEnabled(nextEnabled);
+      setStatusMsg(nextEnabled ? "Alert resumed — you'll be alerted at your target." : "Alert paused — the target is kept and price tracking continues.");
+      setTimeout(() => setStatusMsg(null), 3500);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setStatusMsg("Error updating alert. Please try again.");
     }
   };
 
@@ -109,22 +146,50 @@ export function TargetPriceAlert({
           </span>
           <div>
             <strong>Price Drop Alert</strong>
-            <p>Set your target price to get notified when price drops</p>
+            <p>Set a target to get an in-app alert when the price reaches it</p>
           </div>
         </div>
         {targetPrice && !isEditing ? (
-          <button
-            type="button"
-            className="target-edit-btn"
-            onClick={() => setIsEditing(true)}
-            aria-label="Edit target price"
-          >
-            Edit
-          </button>
+          <div className="target-alert-actions">
+            <span
+              className={`target-alert-state ${alertsEnabled ? "on" : "off"}`}
+              aria-label={alertsEnabled ? "Alert is on" : "Alert is paused"}
+            >
+              <span className="dot" aria-hidden="true" />
+              {alertsEnabled ? "Alert on" : "Paused"}
+            </span>
+            <button
+              type="button"
+              className="target-edit-btn"
+              onClick={handleToggleEnabled}
+              disabled={isPending}
+              aria-label={alertsEnabled ? "Pause target alert" : "Resume target alert"}
+            >
+              {alertsEnabled ? "Pause" : "Resume"}
+            </button>
+            <button
+              type="button"
+              className="target-edit-btn"
+              onClick={() => setIsEditing(true)}
+              aria-label="Edit target price"
+            >
+              Edit
+            </button>
+          </div>
         ) : null}
       </div>
 
       {statusMsg ? <div className="target-status-banner" role="status" aria-live="polite">{statusMsg}</div> : null}
+
+      {targetPrice && !alertsEnabled && !isEditing ? (
+        <div className="target-paused-banner" role="status">
+          <Icon name="bell" size={14} />
+          <span>
+            Alert paused. Your target of <strong>{formatCurrency(targetPrice)}</strong> is kept and
+            price tracking continues — no in-app alert will be created until you resume.
+          </span>
+        </div>
+      ) : null}
 
       {/* Target status display when targetPrice is set and not editing */}
       {targetPrice && !isEditing ? (
@@ -137,6 +202,12 @@ export function TargetPriceAlert({
               <p>
                 Current price <strong>{formatCurrency(currentPrice!)}</strong> is at or below your
                 target of <strong>{formatCurrency(targetPrice)}</strong>!
+              </p>
+              <p className="target-reached-note">
+                This is an in-app alert only — no email or push notification is sent. When a scan
+                detects the price crossing your target, it is saved to your alert history on the
+                watchlist.{" "}
+                <Link href="/#alerts">View alert history</Link>
               </p>
             </div>
           ) : (

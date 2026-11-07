@@ -68,7 +68,7 @@
 3. **Price stats** — highest+date, lowest+date, most-common + %, change count, avg change frequency, current/stock/source; `calculatePriceStats` in `lib/analytics.ts`.
 4. **Buy advice** — verdict `BUY NOW / FAIR PRICE / WAIT` with deal score /100, SVG gauge, headline + reason, trend (📉/📈/⚖️) + percentile + savings chips; thresholds ≥75 buy, ≥48 fair; single-sample `Gathering Baseline` state.
 5. **Interactive SVG chart** — 720×300, downsampled to 220 (preserves first/last/min/max), MRP dashed line, live vs historical dots, crosshair + keyboard (arrows/Home/End/Escape) inspection, ARIA summary, legend + snapshot count.
-6. **Target-price alerts (in-app)** — `PATCH /api/products/:id`, number input + −5%/−10%/−15%/Lowest presets, progress bar, `🎯 Target Price Reached!` state + list badges; no email/push worker.
+6. **Target-price alerts (in-app)** — `PATCH /api/products/:id`, number input + −5%/−10%/−15%/Lowest presets, progress bar, on/paused state, `🎯 Target Price Reached!` state + list badges, and an idempotent alert-event history on the watchlist (read/dismiss, links to products, cascade delete); no email/push channel.
 7. **Manual rescan + reset** — `POST .../scan` with spinner, `DELETE .../samples` (confirm → clear + rescan + refresh).
 8. **Guest-to-account migration** — private browser watchlist, duplicate-merge claim, concise confirmation; failures never surface as empty lists.
 9. **Recent-drops tape** — `GET /api/recent-drops` (6h cookie rotation, 14-URL Sep-2026 pool, ≤5 scans @8s, returns 3) with skeleton → `▼ %/₹` chips.

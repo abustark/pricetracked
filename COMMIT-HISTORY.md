@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.4`** (current head is `2.0.3` — see below)
+> - **`main` → `2.0.5`** (current head is `2.0.4` — see below)
 
 ---
 
@@ -67,3 +67,23 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `app/products/[id]/page.tsx`: cadence chip shows the effective cadence (`Every 24h`), new "Scanned {date}" chip, and the error block now distinguishes last attempted (date + error) from last successful scan with an explicit stale-data explanation.
   - `.env.example` + `README.md`: `CRON_SCAN_LIMIT` documented; cron safety (locks, batch, budget, stale-lock expiry, failure handling) described.
 - **Intentionally deferred to next batches**: in-app target alert events (P2 → `2.0.4`), tests/observability/a11y (P3+P4 → `2.0.5`).
+
+### 2.0.4 - complete in-app target alerts (P2)
+
+- **Date**: 2026-11-07
+- **Why**: completion-guide Priority 2 — the target-price feature stored a target and drew a "reached" state, but had no real enabled/paused state, no alert events, no history surface, and no read/dismiss lifecycle. Keep it strictly in-app: no email or push claims.
+- **Changes**:
+  - `lib/guest.ts` (new) + `lib/viewer.ts`: shared `isGuestId()` (UUID guest cookie) used by the viewer cookie check and alert creation, so guest ids never get alert events; account ids (Google `sub`) are unaffected.
+  - `lib/types.ts`: new `AlertEventDocument` (`productId`, `userId`, `target`, `observedPrice`, `currency`, `observedAt`, `readAt`, `createdAt`) and serialized `AlertEventView`.
+  - `lib/alerts.ts` (new): `createAlertEvent` (skips guests, duplicate-key no-op), `loadAlertEvents` (latest 20 with product title/store labels), `markAlertsRead` (one or all, user-scoped), `dismissAlert` (user-scoped delete), `deleteAlertEventsForProduct` (cascade).
+  - `lib/scanner.ts`: crossing detection in `scanAndSaveProduct` — event only when a genuine successful observation moves `targetPriceReached` false → true, the alert is enabled, and a target exists; transition state prevents duplicate events on later below-target scans. Exported `releaseScanLock` (was missing the keyword while the manual-scan route imported it).
+  - `lib/db.ts`: `alert_events` indexes — `{userId, observedAt:-1}` for the watchlist and unique `{productId, target, observedAt}` for idempotency.
+  - `app/api/alerts/route.ts` (new): `GET` list, `PATCH` mark one/all read (`{id}` or `{all:true}`), `DELETE ?id=` dismiss; all user-scoped and signed-in only.
+  - `app/api/products/[id]/route.ts`: deleting a product now deletes its alert events; target edits keep setting `targetPriceReached` from the last genuine price (already-below-target copy is shown, no fabricated crossing event).
+  - `components/TargetPriceAlert.tsx`: "Alert on / Paused" status pill, Pause/Resume button wired to `targetAlertEnabled`, dashed paused banner explaining tracking continues, and reached-box copy stating alerts are in-app only with a link to the alert history.
+  - `components/AlertsPanel.tsx` (new, client): accessible region (`role="region"`, labelled heading, `aria-live` error), unread count, "Mark all read", per-event link to the product page, Mark read and Dismiss actions, and an empty state.
+  - `app/page.tsx`: signed-in users' latest alerts loaded server-side (try/catch → `[]`) and rendered on the watchlist before the product list.
+  - `app/globals.css`: styles for alert state pill, paused banner, reached note, alerts panel/list/actions with a small-screen layout — existing layout and themes untouched.
+  - `README.md`: new "Target Price Alerts" section (in-app only, crossing rules, paused behaviour, cascade delete), alerts API endpoints, and data-model notes.
+  - `PROJECT-INFO.md` + `app/privacy/page.tsx`: feature inventory and stored-data copy mention the in-app alert history (no email/push).
+- **Intentionally deferred to next batches**: tests/observability/a11y (P3+P4 → `2.0.5`).

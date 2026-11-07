@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import { getDb } from "@/lib/db";
+import { isGuestId } from "@/lib/guest";
 import type { ProductDocument } from "@/lib/types";
 
 export const GUEST_COOKIE = "pricetracked-guest-id";
 const GUEST_COOKIE_MAX_AGE = 60 * 60 * 24 * 180;
-const GUEST_ID_PATTERN = /^[0-9a-f-]{36}$/i;
 
 type Viewer = {
   userId?: string;
@@ -96,5 +96,5 @@ export function setGuestCookie(response: NextResponse, guestId?: string): void {
 }
 
 function getGuestId(value?: string): string | undefined {
-  return value && GUEST_ID_PATTERN.test(value) ? value : undefined;
+  return isGuestId(value) ? value : undefined;
 }

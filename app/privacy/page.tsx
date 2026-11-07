@@ -37,8 +37,8 @@ export default function PrivacyPage() {
             attach your watchlist to your account.
           </li>
           <li>
-            <strong>Your watchlist:</strong> the links, prices and alert targets you add, so they
-            sync across your devices.
+            <strong>Your watchlist:</strong> the links, prices, alert targets and in-app alert
+            history you add, so they sync across your devices.
           </li>
           <li>
             <strong>Guest watchlists:</strong> kept in this browser until you sign in and claim

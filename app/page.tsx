@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { loadAlertEvents } from "@/lib/alerts";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
-import type { ProductDocument } from "@/lib/types";
+import type { AlertEventView, ProductDocument } from "@/lib/types";
+import { AlertsPanel } from "@/components/AlertsPanel";
 import { TrackForm } from "@/components/TrackForm";
 import { ProductList } from "@/components/ProductList";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -15,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const viewer = await getViewer();
   const products = viewer.userId ? await loadProducts(viewer.userId) : [];
+  const alerts = viewer.signedIn && viewer.userId ? await loadAlerts(viewer.userId) : [];
   const signedIn = viewer.signedIn;
 
   return (
@@ -106,6 +109,7 @@ export default async function Home() {
           </div>
           <span className="list-count">{products.length} {products.length === 1 ? "item" : "items"}</span>
         </div>
+        {signedIn ? <AlertsPanel initialAlerts={alerts} /> : null}
         <ProductList products={products.map((product) => serializeProduct(product))} signedIn={signedIn} />
       </section>
 
@@ -124,6 +128,14 @@ async function loadProducts(userId?: string): Promise<ProductDocument[]> {
       .sort({ updatedAt: -1 })
       .limit(50)
       .toArray();
+  } catch {
+    return [];
+  }
+}
+
+async function loadAlerts(userId: string): Promise<AlertEventView[]> {
+  try {
+    return await loadAlertEvents(userId);
   } catch {
     return [];
   }

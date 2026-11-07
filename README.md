@@ -107,6 +107,16 @@ node scripts/migrate-synthetic-history.mjs --restore=backup-synthetic-history-<t
 
 The script only deletes records whose `source` is `historical` or `mrp-baseline` (with a positive numeric price and a past `capturedAt`); `direct`/`proxy` observations are never touched. It is idempotent — re-running `--execute` after success deletes 0 documents. Requires `MONGODB_URI` (and optionally `MONGODB_DB`, default `price_tracker`).
 
+## Target Price Alerts
+
+Target-price alerts are **in-app only**. There is no email or push delivery, and nothing in the UI claims otherwise.
+
+- Each product can have one target price plus an enabled/paused state (`targetPrice`, `targetAlertEnabled`).
+- A scan creates an alert event **only** when a genuine `direct`/`proxy` observation crosses the price from above the target to at-or-below it, **and** the alert is enabled. Repeated scans below the target never create duplicates — the product's `targetPriceReached` transition state is the idempotency guard, backed by a unique `{productId, target, observedAt}` index.
+- Setting a target while the current price is already at or below it shows the reached state immediately (with copy explaining the price was already below the target); it does not fabricate a crossing event.
+- Pausing keeps the target and price tracking but suppresses new alert events until resumed.
+- The watchlist shows a compact alert history (`AlertsPanel`): each event links to its product, can be marked read or dismissed, and can be bulk-marked read. Deleting a product deletes its alert events. Signed-out/guest tracking has no alert history surface.
+
 ## Scraping Notes
 
 Direct HTML fetching can be blocked by ecommerce anti-bot systems. The scanner is intentionally isolated in `lib/scanner.ts` so you can replace or enhance it without changing the UI or analytics.
@@ -183,6 +193,14 @@ GET /api/cron/scan
 
 For manual cron calls outside Vercel Cron, pass `?token=<CRON_SECRET>` or the `x-cron-secret` header.
 
+In-app alerts (signed-in users only):
+
+```http
+GET    /api/alerts                 # list the user's alert events
+PATCH  /api/alerts                 # {"id": "..."} or {"all": true} to mark read
+DELETE /api/alerts?id=<alertId>    # dismiss one alert
+```
+
 ## Data Model
 
 `products`
@@ -191,7 +209,8 @@ For manual cron calls outside Vercel Cron, pass `?token=<CRON_SECRET>` or the `x
 - store key
 - title and image
 - last price and scan metadata
-- scan interval and next scan time
+- scan interval, next scan time, last attempt, failure count and scan lock
+- optional target price, reached state and alert enabled state
 
 `price_samples`
 
@@ -200,6 +219,13 @@ For manual cron calls outside Vercel Cron, pass `?token=<CRON_SECRET>` or the `x
 - captured date
 - stock status when detected
 - source: direct or proxy
+
+`alert_events`
+
+- product id and owning user id
+- target and observed price/currency
+- observation time and read state
+- removed automatically when the product (or its owner's account data) is deleted
 
 ## Legal and Operational Notes
 
