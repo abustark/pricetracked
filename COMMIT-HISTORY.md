@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.7`** (current head is `2.0.6` — see below)
+> - **`main` → `2.0.8`** (current head is `2.0.7` — see below)
 
 ---
 
@@ -121,5 +121,16 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `.env.example`: added `CRON_TIME_BUDGET_MS` alongside `CRON_SCAN_LIMIT`.
   - `AUDIT.md`: added a re-verification status block — point-in-time report; light `--muted` is now `#5d574a` (≈6.5:1, AA pass), nav/theme controls already 44px, errors already sanitised; the two genuine gaps (form-error association, watchlist load failure) were fixed in `2.0.5`; legacy typography/benchmark details may be stale.
   - No runtime code changed in this commit; tests were still not executed (owner approval pending).
+
+### 2.0.7 - remove unused AI/dev scaffolding
+
+- **Date**: 2026-11-07
+- **Why**: owner request — the historical Arena brief was no longer needed, and the remaining AI/dev scratch material did not belong in the product repo.
+- **Changes**:
+  - Deleted `ANTIGRAVITY_EXECUTION_PROMPT.md` (historical Arena brief, superseded by `AGENTS.md` + `README.md`/`PROJECT-INFO.md`).
+  - Deleted `.playwright-cli/` (3 one-off page snapshots from 2026-09-12), `PASTE- sandbox browser/` (4-file external visual-check kit) and `bug and fixes summary/` (3-file paste-in protocol/template) — 11 tracked files total, none referenced by app code, tests or CI.
+  - `PROJECT-INFO.md`: counts updated to 89 tracked files and 69 commits; QA line now lists only `artifacts/*.png`, docs line drops `ANTIGRAVITY_EXECUTION_PROMPT.md`.
+  - Kept intentionally: `AUDIT.md` (point-in-time audit with status block), `artifacts/*.png` (screenshots required by repo rule 4), `start-ai.bat` (local launcher).
+  - No runtime code, tests or config changed.
 
 

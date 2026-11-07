@@ -1,8 +1,0 @@
-{
-  "_comment": "Merge these into the 'scripts' object of your package.json. 'visual' targets a Linux sandbox using @sparticuz/chromium (npm-shipped Chromium — no CDN download). 'visual:local' targets a dev machine (Windows/macOS) and auto-detects an installed Chrome/Edge, or honors the ABOT_CHROME env var. POLICY: a locally installed browser (Chrome/Edge) is always preferred and used first; the sandbox Chromium is only a fallback when nothing is installed. Both run node tools/visual-check.js (adjust the path if you place the script elsewhere).",
-  "scripts": {
-    "visual": "LD_LIBRARY_PATH=/tmp/al2023-libs/lib FONTCONFIG_PATH=/tmp/fonts node tools/visual-check.js",
-    "visual:local": "node tools/visual-check.js"
-  },
-  "devDependencies_note": "On a dev machine you only need: npm install --save-dev puppeteer-core. In a Linux sandbox ALSO run: npm install --no-save @sparticuz/chromium (its system libs/fonts are extracted manually — see SANDBOX-BROWSER-VISUAL-TESTS.md steps 2–3)."
-}

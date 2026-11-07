@@ -20,7 +20,7 @@
 | Live site | https://pricetracked.vercel.app |
 | Source | https://github.com/abustark/pricetracked |
 | License | None declared (private) |
-| Status | Production-deployed on Vercel, actively maintained (2026, 68 commits) |
+| Status | Production-deployed on Vercel, actively maintained (2026, 69 commits) |
 
 **One-liners (pick by context):**
 - *10 words:* Ecommerce price tracker with Google sign-in, history charts, cron rescans.
@@ -50,7 +50,7 @@
 | Lint | ESLint | ^9.25.0 + `eslint-config-next` | `npm run lint` |
 | Tests | Vitest | ^5.1.0 | `npm test` — 11 unit suites, network/DNS/MongoDB mocked |
 | CI | GitHub Actions | `.github/workflows/ci.yml` | `npm ci` → lint → typecheck → test → build |
-| VCS | Git / GitHub | `main` + mirrored Arena branch | 68 commits, trunk-based |
+| VCS | Git / GitHub | `main` + mirrored Arena branch | 69 commits, trunk-based |
 
 ---
 
@@ -95,21 +95,21 @@
 
 - **Unit tests (Vitest):** `npm test` / `npm run test:watch`, configured in `vitest.config.mts` (node environment, `@` alias). 11 suites: analytics, schedule, stores/short-links, URL guard, scanner parsing, scanner fetch, scanner scheduler, target-alert decision, alert lifecycle, route ownership, error sanitisation. `fetch`, `node:dns/promises` and `@/lib/db` are mocked — no test touches the network, DNS or a real database.
 - **Gates wired in CI:** `npm run lint` (ESLint `next/core-web-vitals`), `npm run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `npm test`, `npm run build` (`next build`). `.github/workflows/ci.yml` runs all four on push/PR with placeholder env values and no real services.
-- **Manual QA traces:** 3 `.playwright-cli/*.yml` dumps (2026-09-12), `PASTE- sandbox browser/` visual kit, 6 `artifacts/*.png` (light/dark desktop + mobile + chart viewport).
-- **Docs in-repo:** `README.md` (setup, testing, deployment, provenance, alerts, observability, API, data model), `PROJECT-INFO.md`, `AUDIT.md` (point-in-time audit + current status), `ANTIGRAVITY_EXECUTION_PROMPT.md`, `AGENTS.md`.
+- **Visual QA artifacts:** 6 `artifacts/*.png` (light/dark desktop + mobile + chart viewport).
+- **Docs in-repo:** `README.md` (setup, testing, deployment, provenance, alerts, observability, API, data model), `PROJECT-INFO.md`, `AUDIT.md` (point-in-time audit + current status), `AGENTS.md`.
 
 ---
 
 ## 6. Scale metrics (quantifiables)
 
-- **100** git-tracked files; **~6,895 lines** across TS/TSX/CSS (largest `lib/scanner.ts` 759, `app/globals.css` 712, `components/PriceChart.tsx` 341).
+- **89** git-tracked files; **~6,895 lines** across TS/TSX/CSS (largest `lib/scanner.ts` 759, `app/globals.css` 712, `components/PriceChart.tsx` 341).
 - **10 API paths / 10 route files / 16 method handlers** (GET×7, POST×4, PATCH×2, DELETE×3).
 - **16 components** (server + client split), **13 lib modules**, **6 app pages** (`/`, `/products/[id]`, `/how-it-works`, `/privacy`, `/terms`, `/auth/google/callback`) plus `layout`, `not-found`, `loading` and `opengraph-image`.
 - **3 collections, 7 indexes** (`products`: unique `{userId,normalizedUrl}`, `{active,nextScanAt}`, `{userId,updatedAt}`; `price_samples`: `{productId,capturedAt}`, `{productId,price}`; `alert_events`: `{userId,observedAt}`, unique `{productId,target,observedAt}`).
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
 - Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown in "Recent scans"; chart downsamples to **220** points.
 - Cron bounds: **10** products per run by default (**50** max) within a **45s** budget; **5-minute** stale-lock TTL.
-- **68 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
+- **69 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
 
 ---
 
