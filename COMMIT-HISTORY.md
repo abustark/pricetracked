@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.1`** (current head is `2.1.0` — see below)
+> - **`main` → `2.1.2`** (current head is `2.1.1` — see below)
 
 ---
 
@@ -177,5 +177,17 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `README.md`: Local Setup (`bun install`, `bun run dev`) and Testing (`bun run test` / `bun run test:watch`, CI wording) now show Bun commands.
   - `PROJECT-INFO.md`: stack Lint/Tests/CI rows, feature 16, and §5 gated commands switched to `bun install` / `bun run …`; noted all scripts run via Bun; reconciled to `2.1.0` — 73 commits. `package.json` scripts and `vercel.json` untouched (Vercel still builds via its default npm path — deployment switch not requested).
   - No app code, tests or configs changed; gates not re-run in this batch (not requested — next run uses `bun run` per rule 5).
+
+### 2.1.1 - finish Bun migration and run gates via Bun
+
+- **Date**: 2026-11-07
+- **Why**: owner request — complete the npm→Bun migration (`bun.lock` + frozen CI + Vercel build), then run all test gates via `bun run`.
+- **Changes**:
+  - `bun.lock` (new) + `package-lock.json` (deleted): full lockfile migration; `bun install` (1.4.4) migrated from the old lockfile in ~97s. Tracked-file count unchanged (81): one added, one removed.
+  - `.github/workflows/ci.yml`: install step is now `bun install --frozen-lockfile` (deterministic from `bun.lock`).
+  - `vercel.json`: added `"installCommand": "bun install --frozen-lockfile"` and `"buildCommand": "bun run build"` so production builds run under Bun instead of Vercel's auto-detected npm path. Cron and header settings untouched.
+  - `README.md` / `PROJECT-INFO.md`: CI wording now shows the frozen install; §5 notes the `bun.lock` migration and the removal of `package-lock.json`; PROJECT-INFO reconciled to `2.1.1` — 74 commits.
+  - Gate results via Bun (CI order): `bun run lint` clean, `bun run typecheck` clean, `bun run test` **11 files / 113 tests passed**, `bun run build` compiled with 12 static pages in 27s (vs 2.5 min under npm).
+  - No app code or tests changed.
 
 

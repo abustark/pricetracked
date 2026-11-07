@@ -62,7 +62,7 @@ bun run test:watch
 
 Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, scheduler locks and failure backoff, target-alert crossings, alert lifecycle, route ownership and error sanitisation.
 
-CI (`.github/workflows/ci.yml`) runs `bun install`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
+CI (`.github/workflows/ci.yml`) runs `bun install --frozen-lockfile`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
 
 ## Google Sign In
 

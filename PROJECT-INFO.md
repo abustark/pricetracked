@@ -6,7 +6,7 @@
 > and tone to the target (resume = dense & quantified; portfolio = readable &
 > story-driven).
 >
-> **Last reconciled with the code:** `2.1.0` (2026-11-07).
+> **Last reconciled with the code:** `2.1.1` (2026-11-07).
 
 ---
 
@@ -20,7 +20,7 @@
 | Live site | https://pricetracked.vercel.app |
 | Source | https://github.com/abustark/pricetracked |
 | License | None declared (private) |
-| Status | Production-deployed on Vercel, actively maintained (2026, 73 commits) |
+| Status | Production-deployed on Vercel, actively maintained (2026, 74 commits) |
 
 **One-liners (pick by context):**
 - *10 words:* Ecommerce price tracker with Google sign-in, history charts, cron rescans.
@@ -49,8 +49,8 @@
 | SEO | metadataBase, OG ImageResponse, `icon.svg` | — | Discoverability |
 | Lint | ESLint | ^9.25.0 + `eslint-config-next` | `bun run lint` |
 | Tests | Vitest | ^5.1.0 | `bun run test` — 11 unit suites, network/DNS/MongoDB mocked |
-| CI | GitHub Actions | `.github/workflows/ci.yml` | `bun install` → lint → typecheck → test → build |
-| VCS | Git / GitHub | `main` + mirrored Arena branch | 73 commits, trunk-based |
+| CI | GitHub Actions | `.github/workflows/ci.yml` | `bun install --frozen-lockfile` → lint → typecheck → test → build |
+| VCS | Git / GitHub | `main` + mirrored Arena branch | 74 commits, trunk-based |
 
 ---
 
@@ -94,7 +94,7 @@
 ## 5. Quality & testing
 
 - **Unit tests (Vitest):** `bun run test` / `bun run test:watch`, configured in `vitest.config.mts` (node environment, `@` alias). 11 suites: analytics, schedule, stores/short-links, URL guard, scanner parsing, scanner fetch, scanner scheduler, target-alert decision, alert lifecycle, route ownership, error sanitisation. `fetch`, `node:dns/promises` and `@/lib/db` are mocked — no test touches the network, DNS or a real database.
-- **Gates wired in CI:** `bun run lint` (ESLint `next/core-web-vitals`), `bun run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `bun run test`, `bun run build` (`next build`). All scripts run via Bun (repo rule 5); `package.json` scripts unchanged. `.github/workflows/ci.yml` runs all four on push/PR with placeholder env values and no real services.
+- **Gates wired in CI:** `bun run lint` (ESLint `next/core-web-vitals`), `bun run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `bun run test`, `bun run build` (`next build`). All scripts run via Bun (repo rule 5); `package.json` scripts unchanged. CI and Vercel install frozen from `bun.lock` (`bun install --frozen-lockfile`); `package-lock.json` removed in `2.1.1`. `.github/workflows/ci.yml` runs all four on push/PR with placeholder env values and no real services.
 - **Docs in-repo:** `README.md` (setup, testing, deployment, provenance, alerts, observability, API, data model), `PROJECT-INFO.md`, `AGENTS.md`.
 
 ---
@@ -108,7 +108,7 @@
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
 - Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown in "Recent scans"; chart downsamples to **220** points.
 - Cron bounds: **10** products per run by default (**50** max) within a **45s** budget; **5-minute** stale-lock TTL.
-- **73 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
+- **74 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
 
 ---
 
