@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.5`** (current head is `2.0.4` — see below)
+> - **`main` → `2.0.6`** (current head is `2.0.5` — see below)
 
 ---
 
@@ -87,3 +87,27 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `README.md`: new "Target Price Alerts" section (in-app only, crossing rules, paused behaviour, cascade delete), alerts API endpoints, and data-model notes.
   - `PROJECT-INFO.md` + `app/privacy/page.tsx`: feature inventory and stored-data copy mention the in-app alert history (no email/push).
 - **Intentionally deferred to next batches**: tests/observability/a11y (P3+P4 → `2.0.5`).
+
+### 2.0.5 - unit tests, CI, observability and accessibility polish (P3+P4)
+
+- **Date**: 2026-11-07
+- **Why**: completion-guide Priority 3 (automated tests + observability) and Priority 4 (a11y/UX polish) — the reliability work from P0–P2 had no regression suite, no operational signal beyond UI errors, and two real accessibility gaps (form errors not associated with their inputs, silent watchlist load failure).
+- **Changes**:
+  - `vitest.config.mts` (new) + `package.json`: **Vitest** with a node environment, `tests/**/*.test.ts` include and the `@` alias; `npm test` (`vitest run`) and `npm run test:watch` scripts. No test touches the network, DNS or MongoDB — `fetch`, `node:dns/promises` and `@/lib/db` are mocked.
+  - `tests/fixtures.ts` (new): deterministic price-sample factory plus JSON-LD/HTML fixture builders.
+  - `tests/analytics.test.ts`: empty/one-sample baselines, repeated price, rise, fall, tied common price, mixed-currency rejection, legacy synthetic exclusion, MRP savings.
+  - `tests/stores.test.ts` + `tests/url-guard.test.ts`: store detection, short links, private/loopback/link-local/CGNAT/reserved IPv4 + private IPv6 rejection, protocol/credential checks, URL normalisation, DNS-rebinding guard (public/private/no-record/DNS-failure).
+  - `tests/scanner-parsing.test.ts`: JSON-LD, Open Graph, Amazon/Flipkart/Myntra/AJIO adapters, generic fallback, missing/malformed price, currency normalisation, stock state.
+  - `tests/scanner-fetch.test.ts`: direct success, retryable failure then success, 5xx retry cap, non-retryable failure, bot-check page, non-HTML response, 2 MB body cap, safe same-store redirect, 5-hop limit, cross-store redirect refusal, proxy fallback.
+  - `tests/schedule.test.ts` + `tests/scanner-schedule.test.ts`: effective cadence, batch/time-budget clamping, due-product filter, atomic claim (lock TTL + stale-lock recovery condition), lock release on success/failure, failure backoff at the effective cadence, last price preserved, duplicate-claim skip.
+  - `tests/target-alerts.test.ts` + `tests/alerts-lifecycle.test.ts`: crossing transition truth table, guest exclusion, insert/duplicate/error handling, alert views with product metadata, mark-read, dismiss, cascade delete.
+  - `tests/ownership.test.ts` + `tests/errors.test.ts`: product/scan/alert routes return 400/401/404 for malformed ids, signed-out viewers and non-owned products; PATCH rejects malformed bodies; error sanitisation hides DB/env details and caps length.
+  - `lib/log.ts` (new): single-line JSON `logEvent()` for `scan_ok`, `scan_failed` and `cron_scan_summary` (store, source, attempts, counts, duration, schedule) — never URLs, tokens, emails or user ids.
+  - `lib/scanner.ts`: `ScanResult.attempts` operational signal threaded through `fetchHtml`; logs on scan success/failure; exported testable helpers `parseProductHtml`, `looksBlocked`, `isRetryableFetchError`, `buildDueProductFilter`; crossing decision extracted to pure `shouldCreateAlertEvent()` in `lib/alerts.ts`.
+  - `app/api/health/route.ts` (new): `GET` readiness — MongoDB `ping` with a 3s timeout, `200 {status:"ok",db:"up"}` or `503 {status:"degraded",db:"down"}`, `cache-control: no-store`, no secrets or error details.
+  - `app/api/cron/scan/route.ts`: emits `cron_scan_summary` with counts and duration.
+  - `components/TrackForm.tsx` + `components/TargetPriceAlert.tsx`: errors are now programmatically associated with their inputs via `aria-invalid` + `aria-describedby` (stable status ids).
+  - `app/page.tsx` + `app/globals.css`: watchlist load failures show an honest `service-notice` ("your saved products are safe") instead of silently rendering an empty list; `loadProducts` returns `{products, failed}`.
+  - `.github/workflows/ci.yml` (new): `npm ci` → lint → typecheck → `npm test` → build on push/PR (CI-only placeholder env, no real services).
+  - `README.md`: new "Testing" and "Observability" sections, `/api/health` endpoint; `PROJECT-INFO.md`: test framework/CI facts. Test execution was intentionally deferred until the owner approves running gates.
+

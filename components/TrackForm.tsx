@@ -114,6 +114,8 @@ export function TrackForm({ signedIn = false }: { signedIn?: boolean }) {
             inputMode="url"
             autoComplete="url"
             aria-label="Product URL"
+            aria-invalid={status === "error" ? true : undefined}
+            aria-describedby={message ? "track-form-status" : undefined}
             disabled={busy}
             required
           />
@@ -159,7 +161,7 @@ export function TrackForm({ signedIn = false }: { signedIn?: boolean }) {
       </div>
       <div className={`status-slot ${message ? "has-message" : ""}`}>
         {message ? (
-          <div className={`status-banner ${status}`} role={status === "error" ? "alert" : "status"} aria-live={status === "error" ? "assertive" : "polite"} aria-atomic="true">
+          <div id="track-form-status" className={`status-banner ${status}`} role={status === "error" ? "alert" : "status"} aria-live={status === "error" ? "assertive" : "polite"} aria-atomic="true">
             {busy ? <span className="pulse-dot" aria-hidden="true" /> : null}
             <span>{message}</span>
           </div>

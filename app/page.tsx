@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const viewer = await getViewer();
-  const products = viewer.userId ? await loadProducts(viewer.userId) : [];
+  const watchlist = viewer.userId ? await loadProducts(viewer.userId) : { products: [], failed: false };
+  const products = watchlist.products;
   const alerts = viewer.signedIn && viewer.userId ? await loadAlerts(viewer.userId) : [];
   const signedIn = viewer.signedIn;
 
@@ -110,7 +111,17 @@ export default async function Home() {
           <span className="list-count">{products.length} {products.length === 1 ? "item" : "items"}</span>
         </div>
         {signedIn ? <AlertsPanel initialAlerts={alerts} /> : null}
-        <ProductList products={products.map((product) => serializeProduct(product))} signedIn={signedIn} />
+        {watchlist.failed ? (
+          <div className="service-notice" role="status">
+            <Icon name="globe" size={15} />
+            <span>
+              We couldn&apos;t load your watchlist right now. Your saved products are safe — please
+              refresh in a moment.
+            </span>
+          </div>
+        ) : (
+          <ProductList products={products.map((product) => serializeProduct(product))} signedIn={signedIn} />
+        )}
       </section>
 
       <SiteFooter />
@@ -118,18 +129,19 @@ export default async function Home() {
   );
 }
 
-async function loadProducts(userId?: string): Promise<ProductDocument[]> {
-  if (!userId) return [];
+async function loadProducts(userId?: string): Promise<{ products: ProductDocument[]; failed: boolean }> {
+  if (!userId) return { products: [], failed: false };
   try {
     const db = await getDb();
-    return await db
+    const products = await db
       .collection<ProductDocument>("products")
       .find({ userId })
       .sort({ updatedAt: -1 })
       .limit(50)
       .toArray();
+    return { products, failed: false };
   } catch {
-    return [];
+    return { products: [], failed: true };
   }
 }
 

@@ -47,6 +47,19 @@ GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 
 Open `http://localhost:3010`, paste a product URL, and the app will scan and save the first price sample. Signed-out visitors keep a private watchlist in their browser; sign in with Google before tracking if you need access across devices.
 
+## Testing
+
+Unit tests use **Vitest** (`vitest.config.mts`) and never touch the network, DNS or MongoDB — `fetch`, `node:dns/promises` and the database are mocked, and only fixture HTML is parsed.
+
+```bash
+npm test          # single run
+npm run test:watch
+```
+
+Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, scheduler locks and failure backoff, target-alert crossings, alert lifecycle, route ownership and error sanitisation.
+
+CI (`.github/workflows/ci.yml`) runs `npm ci`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
+
 ## Google Sign In
 
 PriceTracked uses Auth.js/NextAuth Google OAuth so tracked product links are saved to the signed-in user and available across devices.
@@ -86,6 +99,12 @@ Vercel Cron sends an HTTP `GET` request to the configured path in production. Th
 > **Scheduler constraint (Vercel Hobby):** this project runs on the free Hobby plan, which permits **daily cron only** (`0 0 * * *`). Scans therefore happen at most once per day in production regardless of the per-product `scanEveryHours` setting. The UI always shows the **effective** cadence — `max(scanEveryHours, 24)` from `lib/schedule.ts` — so products never advertise a 6-hour cadence they cannot get. Only after upgrading to Pro may the schedule become `0 */6 * * *`.
 
 **Cron run safety:** each cron run scans at most `CRON_SCAN_LIMIT` products (default 10, max 50) sequentially within a ~45s wall-clock budget (`CRON_TIME_BUDGET_MS`). Before any fetch, a product is claimed with an atomic `scanLockUntil` lock (5-minute TTL, stale locks self-expire) via `claimProductScan()` — overlapping cron runs and manual rescans cannot double-scan the same product. Failed scans preserve the last valid price, record `lastError`/`lastAttemptAt`, and retry at the next scheduled run; the product page shows the last successful scan separately from the last failed attempt.
+
+## Observability
+
+Operational events are emitted as single-line JSON (`lib/log.ts`) so Vercel log drains can parse them: `scan_ok` (store, source, attempts, duration), `scan_failed` (store, duration, short reason) and `cron_scan_summary` (scanned/ok/failed/skipped, duration, schedule). Events never include URLs, cookies, tokens, emails, names or user ids.
+
+Readiness is exposed at `GET /api/health`: it pings MongoDB and returns `200 {status:"ok",db:"up",...}` or `503 {status:"degraded",db:"down",...}`. The response contains no secrets, connection strings or error details and is sent with `cache-control: no-store`.
 
 ## Price History Provenance
 
@@ -192,6 +211,12 @@ GET /api/cron/scan
 ```
 
 For manual cron calls outside Vercel Cron, pass `?token=<CRON_SECRET>` or the `x-cron-secret` header.
+
+Readiness check:
+
+```http
+GET /api/health
+```
 
 In-app alerts (signed-in users only):
 

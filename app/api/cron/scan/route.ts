@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureIndexes } from "@/lib/db";
+import { logEvent } from "@/lib/log";
 import { scanDueProducts } from "@/lib/scanner";
 import { CRON_SCHEDULE } from "@/lib/schedule";
 
@@ -23,13 +24,23 @@ export async function GET(request: Request) {
   const results = await scanDueProducts();
   const okCount = results.filter((result) => result.ok).length;
   const skippedCount = results.filter((result) => result.skipped).length;
+  const durationMs = Date.now() - startedAt;
+
+  logEvent("cron_scan_summary", {
+    scanned: results.length,
+    ok: okCount,
+    failed: results.length - okCount - skippedCount,
+    skipped: skippedCount,
+    durationMs,
+    schedule: CRON_SCHEDULE
+  });
 
   return NextResponse.json({
     scanned: results.length,
     ok: okCount,
     failed: results.length - okCount - skippedCount,
     skipped: skippedCount,
-    durationMs: Date.now() - startedAt,
+    durationMs,
     schedule: CRON_SCHEDULE,
     results
   });

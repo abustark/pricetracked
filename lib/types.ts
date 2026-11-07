@@ -52,6 +52,8 @@ export type ScanResult = {
   imageUrl?: string;
   inStock?: boolean;
   source: "direct" | "proxy";
+  /** Fetch attempts used (1 = no retry). Operational signal only. */
+  attempts?: number;
 };
 
 export type DealVerdict = "buy_now" | "fair_price" | "wait";

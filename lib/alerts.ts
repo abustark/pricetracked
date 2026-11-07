@@ -115,3 +115,31 @@ export async function deleteAlertEventsForProduct(productId: ObjectId): Promise<
   const db = await getDb();
   await db.collection<AlertEventDocument>("alert_events").deleteMany({ productId });
 }
+
+/**
+ * Pure crossing decision used by the scanner. An event is created only when:
+ * - the product already existed (a first-time add is not a crossing),
+ * - a target exists,
+ * - alerts are not explicitly paused (`false`; legacy `undefined` is enabled),
+ * - the last genuine observation was above the target (`previouslyReached` false),
+ * - this genuine observation is at or below it (`nowReached` true).
+ *
+ * This transition state is the primary idempotency guard: subsequent scans that
+ * stay below the target pass `previouslyReached: true` and never fire again.
+ */
+export function shouldCreateAlertEvent(input: {
+  hasExistingProduct: boolean;
+  targetPrice?: number;
+  targetAlertEnabled?: boolean;
+  previouslyReached?: boolean;
+  nowReached?: boolean;
+}): boolean {
+  return (
+    input.hasExistingProduct &&
+    input.targetPrice != null &&
+    input.targetPrice > 0 &&
+    input.targetAlertEnabled !== false &&
+    input.nowReached === true &&
+    input.previouslyReached !== true
+  );
+}

@@ -179,7 +179,7 @@ export function TargetPriceAlert({
         ) : null}
       </div>
 
-      {statusMsg ? <div className="target-status-banner" role="status" aria-live="polite">{statusMsg}</div> : null}
+      {statusMsg ? <div id="target-alert-status" className="target-status-banner" role="status" aria-live="polite">{statusMsg}</div> : null}
 
       {targetPrice && !alertsEnabled && !isEditing ? (
         <div className="target-paused-banner" role="status">
@@ -248,6 +248,8 @@ export function TargetPriceAlert({
                 onChange={(e) => setInputVal(e.target.value)}
                 className="target-input"
                 aria-label="Target price in currency"
+                aria-invalid={statusMsg?.startsWith("Error") ? true : undefined}
+                aria-describedby={statusMsg ? "target-alert-status" : undefined}
                 required
               />
             </div>

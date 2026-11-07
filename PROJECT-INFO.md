@@ -46,6 +46,8 @@
 | Charts | Hand-rolled SVG | `PriceChart.tsx` 414 lines, no chart lib | 720×300 interactive chart |
 | SEO | metadataBase, OG ImageResponse, `icon.svg` | — | Discoverability |
 | Lint | ESLint | ^9.25.0 + `eslint-config-next` | `npm run lint` |
+| Tests | Vitest | ^5.1.0 | `npm test` — unit suite with mocked network/DNS/MongoDB |
+| CI | GitHub Actions | `.github/workflows/ci.yml` | `npm ci` → lint → typecheck → test → build |
 | VCS | Git / GitHub | main branch | 60 commits, trunk-based |
 
 ---
@@ -82,8 +84,9 @@
 
 ## 5. Quality & testing
 
-- **No unit/e2e framework:** no jest/vitest/cypress/playwright dependencies in `package.json`.
-- **Gates that do exist:** `npm run lint` (ESLint `next/core-web-vitals`), `npm run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `npm run build` (`next build`).
+- **Unit tests (Vitest):** `npm test` / `npm run test:watch`, configured in `vitest.config.mts` (node environment, `@` alias). 11 suites cover price parsing, URL/SSRF safety, analytics provenance, scanner retry/blocked/proxy/redirect/size handling, scheduler locks/backoff, target alerts, route ownership and error sanitisation. `fetch`, `node:dns/promises` and `@/lib/db` are mocked — no test touches the network, DNS or a real database.
+- **Gates:** `npm run lint` (ESLint `next/core-web-vitals`), `npm run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `npm test`, `npm run build` (`next build`).
+- **CI:** `.github/workflows/ci.yml` runs install → lint → typecheck → test → build on push/PR using placeholder env values only.
 - **Manual QA traces:** 3 `.playwright-cli/*.yml` dumps (2026-09-12), `PASTE- sandbox browser/` visual kit, 6 `artifacts/*.png` (light/dark desktop + mobile + chart viewport).
 - **Docs in-repo:** `README.md` (177 lines), `AUDIT.md`, `ANTIGRAVITY_EXECUTION_PROMPT.md` (Arena execution spec), `AGENTS.md`, this sheet.
 
@@ -127,10 +130,10 @@ price tracker, ecommerce analytics, Next.js 15, App Router, React 19, TypeScript
 - Designed a scraper→upsert pipeline (Chrome UA, 18s×3 attempts, proxy fallback, store-specific + generic parsing, MRP/currency/stock extraction) with per-user `{userId,normalizedUrl}` uniqueness and daily Vercel Cron rescans (≤20 due per run).
 - Implemented Google OAuth via Auth.js (standard handler + fast popup code-exchange flow) with guest UUID watchlists that merge into accounts on sign-in, plus in-app target-price alerts and manual rescan/history-reset actions.
 - Created a hand-rolled SVG price chart (220-point downsampling, MRP overlay, crosshair + keyboard inspection) with highest/lowest/mode/change-frequency stats and a BUY/FAIR/WAIT verdict with deal score.
-- Shipped a themed responsive app (custom CSS, dark/light with FOUC guard, 7 pages, SEO/OG images) on Vercel; gated by ESLint + `tsc --noEmit` + `next build`, no unit framework.
+- Shipped a themed responsive app (custom CSS, dark/light with FOUC guard, 7 pages, SEO/OG images) on Vercel; gated by ESLint, `tsc --noEmit`, a Vitest unit suite and a GitHub Actions CI pipeline.
 
 **Resume project paragraph (3 lines):** Ecommerce price tracker built with Next.js 15, React 19 and MongoDB, deployed on Vercel with daily cron rescans. Features dedicated Amazon/Flipkart/Myntra/AJIO adapters plus generic fallback, Google sign-in with guest-to-account watchlist migration, and an interactive SVG history chart with buy advice and target alerts. Ships as a themed responsive app with 7 API paths, per-user isolation and strict TypeScript + ESLint gates.
 
 **Portfolio card (title + ~30 words + stack):** PriceTracked — paste any product link to track its price over time, see highs/lows/trends with a buy verdict, set target alerts, and let daily scans keep history fresh. Guest mode included. `Next.js · React · MongoDB · Auth.js · Vercel`
 
-**Tone/length guide for the AI:** Frame impact as user capability + the hardest engineering problem solved (no business KPIs). Resume = 3–5 dense bullets or one 3-line paragraph, lead with verbs and numbers, keywords from §8; portfolio = friendly paragraph + feature list + stack chips, mention the 4-store adapters, the guest-claim flow, and the hand-rolled chart; never claim email alerts, PWA installability, or a unit test suite — none exist.
+**Tone/length guide for the AI:** Frame impact as user capability + the hardest engineering problem solved (no business KPIs). Resume = 3–5 dense bullets or one 3-line paragraph, lead with verbs and numbers, keywords from §8; portfolio = friendly paragraph + feature list + stack chips, mention the 4-store adapters, the guest-claim flow, and the hand-rolled chart; never claim email alerts, PWA installability, or browser/e2e coverage — none exist (unit tests are Vitest only).

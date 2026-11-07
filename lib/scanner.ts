@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { createAlertEvent } from "@/lib/alerts";
+import { createAlertEvent, shouldCreateAlertEvent } from "@/lib/alerts";
+import { logEvent } from "@/lib/log";
 import {
   DEFAULT_SCAN_EVERY_HOURS,
   INTER_PRODUCT_DELAY_MS,
@@ -52,7 +53,8 @@ export async function fetchProductSnapshot(url: string): Promise<ScanResult> {
         price: parsed.price,
         mrp: parsed.mrp,
         discountPercent: parsed.discountPercent,
-        source: direct.source
+        source: direct.source,
+        attempts: direct.attempts
       };
     }
   } catch (error) {
@@ -69,7 +71,8 @@ export async function fetchProductSnapshot(url: string): Promise<ScanResult> {
           price: proxyParsed.price,
           mrp: proxyParsed.mrp,
           discountPercent: proxyParsed.discountPercent,
-          source: proxy.source
+          source: proxy.source,
+          attempts: proxy.attempts
         };
       }
     } catch {
@@ -83,7 +86,33 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
   const resolvedUrl = await resolveSupportedProductUrl(inputUrl);
   const { store, normalizedUrl } = assertAllowedProductUrl(resolvedUrl);
   const canonicalUrl = canonicalizeStoreUrl(normalizedUrl, store);
-  const snapshot = await fetchProductSnapshot(canonicalUrl);
+  const scanStartedAt = Date.now();
+  let snapshot: ScanResult;
+
+  try {
+    snapshot = await fetchProductSnapshot(canonicalUrl);
+  } catch (error) {
+    logEvent(
+      "scan_failed",
+      {
+        store,
+        durationMs: Date.now() - scanStartedAt,
+        reason: (error instanceof Error ? error.message : "unknown").slice(0, 160)
+      },
+      "warn"
+    );
+    throw error;
+  }
+
+  // Operational signal: success/failure counts, duration, provider source and
+  // retry count. Never logs URLs, cookies, tokens or user identifiers.
+  logEvent("scan_ok", {
+    store,
+    source: snapshot.source,
+    attempts: snapshot.attempts ?? 1,
+    durationMs: Date.now() - scanStartedAt
+  });
+
   const db = await getDb();
   const now = new Date();
 
@@ -149,12 +178,15 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
   // route with its own copy.
   const prevReached = existing?.targetPriceReached === true;
   const nowReached = productUpdate.targetPriceReached === true;
-  // Legacy products with a target but no flag are treated as enabled, matching
-  // the UI default; only an explicit `false` pauses alerts.
-  const crossedToTarget =
-    existing != null && nowReached && !prevReached && existing.targetAlertEnabled !== false;
+  const crossedToTarget = shouldCreateAlertEvent({
+    hasExistingProduct: existing != null,
+    targetPrice: existing?.targetPrice,
+    targetAlertEnabled: existing?.targetAlertEnabled,
+    previouslyReached: prevReached,
+    nowReached
+  });
 
-  if (crossedToTarget && existing.targetPrice != null) {
+  if (crossedToTarget && existing?.targetPrice != null) {
     await createAlertEvent({
       productId,
       userId: existing.userId,
@@ -247,6 +279,18 @@ export async function releaseScanLock(
 }
 
 /**
+ * Due-product selection filter. Kept as a pure exported helper so the scheduler
+ * contract (active, due, has a real non-guest owner) is unit-testable.
+ */
+export function buildDueProductFilter(now: Date) {
+  return {
+    active: true,
+    nextScanAt: { $lte: now },
+    userId: { $exists: true, $nin: ["", "guest"] }
+  };
+}
+
+/**
  * Scan due products. Every product is atomically claimed before fetching, so
  * overlapping cron runs or a manual rescan cannot double-scan. The batch is
  * bounded (CRON_SCAN_LIMIT, default 10) and the run is bounded by a wall-clock
@@ -262,11 +306,7 @@ export async function scanDueProducts(limit?: number): Promise<DueScanOutcome[]>
 
   const due = await db
     .collection<ProductDocument>("products")
-    .find({
-      active: true,
-      nextScanAt: { $lte: now },
-      userId: { $exists: true, $nin: ["", "guest"] }
-    })
+    .find(buildDueProductFilter(now))
     .sort({ nextScanAt: 1 })
     .limit(batchLimit)
     .toArray();
@@ -305,7 +345,7 @@ async function fetchHtml(
   url: string,
   store: StoreKey,
   mode: "direct" | "proxy"
-): Promise<{ html: string; source: "direct" | "proxy" }> {
+): Promise<{ html: string; source: "direct" | "proxy"; attempts: number }> {
   const proxyConfig = getProxyConfig();
   const baseTarget = mode === "proxy" ? buildProxyUrl(url, proxyConfig) : url;
   let lastError: unknown;
@@ -357,7 +397,7 @@ async function fetchHtml(
           throw new Error("The store returned a bot-check or blocked response instead of the product page.");
         }
 
-        return { html, source: mode };
+        return { html, source: mode, attempts: attempt };
       }
     } catch (error) {
       lastError = error;
@@ -520,7 +560,7 @@ function followSafeRedirect(currentUrl: string, response: Response, store: Store
   return canonicalizeStoreUrl(nextUrl, store);
 }
 
-function looksBlocked(html: string): boolean {
+export function looksBlocked(html: string): boolean {
   // Real blocked / challenge pages are tiny (< 50KB) and have captcha in the <title> or <h1>
   if (html.length > 50000) return false;
   const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").toLowerCase();
@@ -528,7 +568,7 @@ function looksBlocked(html: string): boolean {
     /<h1>\s*(?:access denied|blocked|captcha)\s*<\/h1>/i.test(html);
 }
 
-function isRetryableFetchError(error: unknown): boolean {
+export function isRetryableFetchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /fetch failed|network|timeout|aborted|econnreset|etimedout|tls|ssl|handshake|internal error|HTTP 429|HTTP 500|HTTP 502|HTTP 503|HTTP 504/i.test(
     message
@@ -580,7 +620,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseProductHtml(html: string, store: StoreKey): ParsedProduct {
+export function parseProductHtml(html: string, store: StoreKey): ParsedProduct {
   const jsonLd = parseJsonLd(html);
   const meta = parseMeta(html);
   const title = cleanText(jsonLd.title || meta.title || extractTitle(html) || "Tracked product");
