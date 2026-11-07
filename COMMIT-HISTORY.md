@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.2`** (current head is `2.1.1` — see below)
+> - **`main` → `2.1.3`** (current head is `2.1.2` — see below)
 
 ---
 
@@ -189,5 +189,14 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `README.md` / `PROJECT-INFO.md`: CI wording now shows the frozen install; §5 notes the `bun.lock` migration and the removal of `package-lock.json`; PROJECT-INFO reconciled to `2.1.1` — 74 commits.
   - Gate results via Bun (CI order): `bun run lint` clean, `bun run typecheck` clean, `bun run test` **11 files / 113 tests passed**, `bun run build` compiled with 12 static pages in 27s (vs 2.5 min under npm).
   - No app code or tests changed.
+
+### 2.1.2 - add dedicated fetch-timeout test
+
+- **Date**: 2026-11-07
+- **Why**: owner request — close the last micro-gap from the completion-guide audit: the P3 scanner table's "timeout" case had no dedicated test (the 18s abort flowed through the generic retryable path, untested by name).
+- **Changes**:
+  - `tests/scanner-fetch.test.ts`: new case "aborts a hung request at the fetch timeout and retries to the attempt cap" — mocks a fetch that only rejects when the abort signal fires, drives the clock with `vi.useFakeTimers()`/`runAllTimersAsync()`, and asserts the wrapped "Could not read this product price…" error plus exactly 3 fetch calls (18s abort × 3 attempts). No 18s real-time wait.
+  - Gate results: `bun run test` **11 files / 114 tests passed**, `bun run typecheck` clean, `bun run lint` clean. (Build not re-run — no app code changed.)
+  - `PROJECT-INFO.md`: reconciled to `2.1.2` — 75 commits.
 
 

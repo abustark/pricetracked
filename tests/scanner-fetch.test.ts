@@ -83,6 +83,31 @@ describe("fetchProductSnapshot", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   }, 15_000);
 
+  it("aborts a hung request at the fetch timeout and retries to the attempt cap", async () => {
+    vi.useFakeTimers();
+
+    fetchMock.mockImplementation(async (_input: string, init?: RequestInit) => {
+      const signal = init?.signal as AbortSignal | undefined;
+      await new Promise((_, reject) => {
+        signal?.addEventListener("abort", () =>
+          reject(new DOMException("The operation was aborted", "AbortError"))
+        );
+      });
+    });
+
+    const assertion = expect(fetchProductSnapshot(PRODUCT_URL)).rejects.toThrow(
+      /could not read|blocked/i
+    );
+    try {
+      await vi.runAllTimersAsync();
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("does not retry a non-retryable failure", async () => {
     fetchMock.mockRejectedValue(new Error("Something unexpected happened"));
 
