@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.0.10`** (current head is `2.0.9` — see below)
+> - **`main` → `2.1.0`** (current head is `2.0.10` — see below)
 
 ---
 
@@ -157,5 +157,15 @@ This document tracks every commit following the `2.0.x` versioning schema:
     - `lib/stores.ts`: `isSafePublicHostname` reordered — dotted-quad IPv4 literals (e.g. `8.8.8.8`) now reach `isSafePublicIpv4` instead of being rejected by the pure-numeric check first (the classifier was dead code for decimal quads); single-integer hex (`0x7f000001`) now fails closed per the function's own doc comment. This fixes the DNS-accept path for hosts resolving to public IPs.
   - Gate results (first full run): `tsc --noEmit` clean, Vitest **11 files / 113 tests passed**, ESLint clean, `next build` compiled with 12 static pages. Local `node_modules` had stripped type declarations (`mongodb`, `@auth/core`); restored with `npm ci` (same lockfile, no dependency changes, 12 audit findings untouched).
   - `PROJECT-INFO.md`: reconciled to `2.0.9` — 71 commits.
+
+### 2.0.10 - adopt Bun over npm
+
+- **Date**: 2026-11-07
+- **Why**: owner request — use Bun instead of npm from now on, recorded as a repo rule.
+- **Changes**:
+  - `AGENTS.md`: new Execution Rule 5 — dependencies via `bun install`, scripts via `bun run <script>`, one-offs via `bun x`/`bunx`; `npm`/`npm run`/`npm ci`/`npx` banned for this repo. Rule is runner-only: `package.json` scripts unchanged, CI workflow intentionally untouched (still npm) pending owner direction.
+  - Verified Bun is available locally (`bun 1.4.4` at `C:\Users\abu\.bun\bin\bun.exe`). No gates re-run in this batch (not requested); next gate run will use `bun run`.
+  - `PROJECT-INFO.md`: reconciled to `2.0.10` — 72 commits.
+  - No code, tests or config changed.
 
 

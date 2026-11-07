@@ -12,6 +12,8 @@ These rules are mandatory for any AI agent working in this repository.
 
 4. **Commit and push every big change.** Significant work (features, redesigns, multi-file edits, rule updates) must be committed and pushed to `origin/main` as part of finishing it — and fast-forwarded onto `arena/01a030cf-pricetracked` so both branches stay identical — without waiting for an explicit request. Only trivial typo-level tweaks may be batched into the next commit.
 
+5. **Use Bun, not npm.** Install dependencies with `bun install` and run scripts with `bun run <script>` (one-off executions via `bun x`/`bunx`); never use `npm`, `npm run`, `npm ci`, or `npx` in this repo. The `package.json` scripts are unchanged — only the runner changes. The CI workflow still uses npm unless the owner asks to switch it.
+
 ## Commit Naming & Versioning (strict)
 
 1. Every commit follows this versioning structure: `2.0.1`, `2.0.2`, ..., `2.0.9`, `2.0.10` ➔ rolls over to `2.1.0`; then `2.1.1`, ..., `2.1.10` ➔ rolls over to `2.2.0`, etc. The third number NEVER exceeds `.10`.
