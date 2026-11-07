@@ -30,9 +30,9 @@ The generic adapter first looks for schema.org Product/Offer JSON-LD, then Open 
 ## Local Setup
 
 ```bash
-npm install
+bun install
 cp .env.example .env.local
-npm run dev
+bun run dev
 ```
 
 Set these environment variables:
@@ -56,13 +56,13 @@ Open `http://localhost:3010`, paste a product URL, and the app will scan and sav
 Unit tests use **Vitest** (`vitest.config.mts`) and never touch the network, DNS or MongoDB — `fetch`, `node:dns/promises` and the database are mocked, and only fixture HTML is parsed.
 
 ```bash
-npm test          # single run
-npm run test:watch
+bun run test          # single run
+bun run test:watch
 ```
 
 Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, scheduler locks and failure backoff, target-alert crossings, alert lifecycle, route ownership and error sanitisation.
 
-CI (`.github/workflows/ci.yml`) runs `npm ci`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
+CI (`.github/workflows/ci.yml`) runs `bun install`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
 
 ## Google Sign In
 

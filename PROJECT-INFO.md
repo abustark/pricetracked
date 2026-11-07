@@ -6,7 +6,7 @@
 > and tone to the target (resume = dense & quantified; portfolio = readable &
 > story-driven).
 >
-> **Last reconciled with the code:** `2.0.10` (2026-11-07).
+> **Last reconciled with the code:** `2.1.0` (2026-11-07).
 
 ---
 
@@ -20,7 +20,7 @@
 | Live site | https://pricetracked.vercel.app |
 | Source | https://github.com/abustark/pricetracked |
 | License | None declared (private) |
-| Status | Production-deployed on Vercel, actively maintained (2026, 72 commits) |
+| Status | Production-deployed on Vercel, actively maintained (2026, 73 commits) |
 
 **One-liners (pick by context):**
 - *10 words:* Ecommerce price tracker with Google sign-in, history charts, cron rescans.
@@ -47,10 +47,10 @@
 | Fonts | Geist, Geist_Mono, Fraunces, Playfair_Display | via Next fonts | Body / mono / display |
 | Charts | Hand-rolled SVG | `PriceChart.tsx` 341 lines, no chart lib | 720×300 interactive chart |
 | SEO | metadataBase, OG ImageResponse, `icon.svg` | — | Discoverability |
-| Lint | ESLint | ^9.25.0 + `eslint-config-next` | `npm run lint` |
-| Tests | Vitest | ^5.1.0 | `npm test` — 11 unit suites, network/DNS/MongoDB mocked |
-| CI | GitHub Actions | `.github/workflows/ci.yml` | `npm ci` → lint → typecheck → test → build |
-| VCS | Git / GitHub | `main` + mirrored Arena branch | 72 commits, trunk-based |
+| Lint | ESLint | ^9.25.0 + `eslint-config-next` | `bun run lint` |
+| Tests | Vitest | ^5.1.0 | `bun run test` — 11 unit suites, network/DNS/MongoDB mocked |
+| CI | GitHub Actions | `.github/workflows/ci.yml` | `bun install` → lint → typecheck → test → build |
+| VCS | Git / GitHub | `main` + mirrored Arena branch | 73 commits, trunk-based |
 
 ---
 
@@ -85,7 +85,7 @@
 13. **Scraper-proxy support** — `SCRAPER_PROXY_ENDPOINT/TOKEN/URL_PARAM/TOKEN_PARAM/AUTH_HEADER` (query- or header-token styles) for legal render providers; manual redirects and same-origin validation.
 14. **Security** — per-user `{userId,normalizedUrl}` uniqueness, `viewer.userId`-scoped detail/update/rescan/delete queries (`notFound`/404 on cross-user), `CRON_SECRET` gate, SSRF/redirect/DNS safeguards, response-type/size limits, `sanitizeErrorMessage` (masks secrets, preserves bot/proxy/captcha hints, 200-char cap).
 15. **Scheduler reliability** — atomic scan claim + stale-lock recovery, bounded batch/time budget, failure backoff with last-price preservation, distinct last-success vs last-attempt UI state.
-16. **Tests + CI** — 11 Vitest suites with `fetch`/DNS/MongoDB mocked, `npm test`/`npm run test:watch`, GitHub Actions running lint → typecheck → test → build.
+16. **Tests + CI** — 11 Vitest suites with `fetch`/DNS/MongoDB mocked, `bun run test`/`bun run test:watch`, GitHub Actions running lint → typecheck → test → build.
 17. **Observability** — structured scan/cron JSON logs and a real readiness endpoint that pings MongoDB.
 18. **Accessibility** — skip link, visible focus rings, 44px nav/control targets, keyboard-operable chart, labelled live regions, `aria-invalid`/`aria-describedby` form-error association, `prefers-reduced-motion` handling, WCAG-AA light/dark muted text.
 
@@ -93,8 +93,8 @@
 
 ## 5. Quality & testing
 
-- **Unit tests (Vitest):** `npm test` / `npm run test:watch`, configured in `vitest.config.mts` (node environment, `@` alias). 11 suites: analytics, schedule, stores/short-links, URL guard, scanner parsing, scanner fetch, scanner scheduler, target-alert decision, alert lifecycle, route ownership, error sanitisation. `fetch`, `node:dns/promises` and `@/lib/db` are mocked — no test touches the network, DNS or a real database.
-- **Gates wired in CI:** `npm run lint` (ESLint `next/core-web-vitals`), `npm run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `npm test`, `npm run build` (`next build`). `.github/workflows/ci.yml` runs all four on push/PR with placeholder env values and no real services.
+- **Unit tests (Vitest):** `bun run test` / `bun run test:watch`, configured in `vitest.config.mts` (node environment, `@` alias). 11 suites: analytics, schedule, stores/short-links, URL guard, scanner parsing, scanner fetch, scanner scheduler, target-alert decision, alert lifecycle, route ownership, error sanitisation. `fetch`, `node:dns/promises` and `@/lib/db` are mocked — no test touches the network, DNS or a real database.
+- **Gates wired in CI:** `bun run lint` (ESLint `next/core-web-vitals`), `bun run typecheck` (`tsc --noEmit`, strict, ES2017, `@/*` alias), `bun run test`, `bun run build` (`next build`). All scripts run via Bun (repo rule 5); `package.json` scripts unchanged. `.github/workflows/ci.yml` runs all four on push/PR with placeholder env values and no real services.
 - **Docs in-repo:** `README.md` (setup, testing, deployment, provenance, alerts, observability, API, data model), `PROJECT-INFO.md`, `AGENTS.md`.
 
 ---
@@ -108,7 +108,7 @@
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
 - Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown in "Recent scans"; chart downsamples to **220** points.
 - Cron bounds: **10** products per run by default (**50** max) within a **45s** budget; **5-minute** stale-lock TTL.
-- **72 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
+- **73 commits** on `main` (mirrored to `arena/01a030cf-pricetracked`).
 
 ---
 

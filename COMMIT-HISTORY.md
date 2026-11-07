@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.0`** (current head is `2.0.10` — see below)
+> - **`main` → `2.1.1`** (current head is `2.1.0` — see below)
 
 ---
 
@@ -167,5 +167,15 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - Verified Bun is available locally (`bun 1.4.4` at `C:\Users\abu\.bun\bin\bun.exe`). No gates re-run in this batch (not requested); next gate run will use `bun run`.
   - `PROJECT-INFO.md`: reconciled to `2.0.10` — 72 commits.
   - No code, tests or config changed.
+
+### 2.1.0 - docs and CI switch to Bun
+
+- **Date**: 2026-11-07
+- **Why**: owner approval — finish the `2.0.10` Bun adoption in user-facing docs and CI (previously only the agent rule existed; commands still said npm).
+- **Changes**:
+  - `.github/workflows/ci.yml`: `actions/setup-node` → `oven-sh/setup-bun@v2`; `npm ci` → `bun install`; all four gates now run via `bun run` (scripts themselves unchanged). Note: no `bun.lock` is committed yet, so CI installs from `package-lock.json`; adding `bun.lock` + a frozen install is a possible follow-up, not done here.
+  - `README.md`: Local Setup (`bun install`, `bun run dev`) and Testing (`bun run test` / `bun run test:watch`, CI wording) now show Bun commands.
+  - `PROJECT-INFO.md`: stack Lint/Tests/CI rows, feature 16, and §5 gated commands switched to `bun install` / `bun run …`; noted all scripts run via Bun; reconciled to `2.1.0` — 73 commits. `package.json` scripts and `vercel.json` untouched (Vercel still builds via its default npm path — deployment switch not requested).
+  - No app code, tests or configs changed; gates not re-run in this batch (not requested — next run uses `bun run` per rule 5).
 
 
