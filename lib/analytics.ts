@@ -118,6 +118,15 @@ export function calculatePriceStats(samples: PriceSampleDocument[], mrp?: number
   };
 }
 
+/**
+ * Minimum evidence for a buy recommendation: at least 14 days of span and 10
+ * accepted observations. Below that, advice falls back to a "Building
+ * history" state — two points can never justify "Best time to buy — All-time
+ * low". These thresholds are product defaults, not statistical certification.
+ */
+const MIN_ADVICE_OBSERVATIONS = 10;
+const MIN_ADVICE_SPAN_DAYS = 14;
+
 function generateBuyAdvice({
   sorted,
   highest,
@@ -141,8 +150,9 @@ function generateBuyAdvice({
       headline: "Gathering Baseline",
       reason: "Tracking just began. Additional scans will detect upcoming price drops and seasonal sales.",
       score: 60,
-      percentile: 50,
-      recentTrend: "stable" as const
+      rangePosition: 50,
+      recentTrend: "stable" as const,
+      limitedHistory: true
     };
   }
 
@@ -161,11 +171,30 @@ function generateBuyAdvice({
   const recentChangeAmount = Math.abs(diff);
 
   const range = highest.price - lowest.price;
-  const percentile =
+  const rangePosition =
     range <= 0 ? 50 : Math.max(0, Math.min(100, Math.round(((current.price - lowest.price) / range) * 100)));
 
+  // Minimum-evidence gate: sparse or short histories never produce confident
+  // buy claims (e.g. "All-time low" after two observations).
+  const spanDays = (current.capturedAt.getTime() - sorted[0].capturedAt.getTime()) / (24 * 60 * 60 * 1000);
+  const hasEnoughEvidence =
+    sorted.length >= MIN_ADVICE_OBSERVATIONS && spanDays >= MIN_ADVICE_SPAN_DAYS;
+
+  if (!hasEnoughEvidence) {
+    return {
+      verdict: "fair_price" as const,
+      headline: "Building history",
+      reason: `Only ${sorted.length} observation(s) across ${Math.max(1, Math.round(spanDays))} day(s) so far — waiting for more scans before giving buy advice.`,
+      score: 50,
+      rangePosition,
+      recentTrend,
+      recentChangeAmount: recentChangeAmount > 0 ? recentChangeAmount : undefined,
+      limitedHistory: true
+    };
+  }
+
   // Calculate composite score (0 - 100)
-  let score = 100 - percentile;
+  let score = 100 - rangePosition;
 
   if (current.price <= lowest.price) {
     score = Math.max(score, sorted.length > 2 ? 96 : 90);
@@ -208,7 +237,7 @@ function generateBuyAdvice({
       reason = `Currently at the lowest price ever observed in tracking history (${formatPrice(current.price)}).`;
     } else {
       headline = "Great Deal — Near Historical Low";
-      reason = `In the bottom ${Math.max(10, percentile)}% of observed prices, substantially below the high of ${formatPrice(highest.price)}.`;
+      reason = `In the bottom ${Math.max(10, rangePosition)}% of the observed range, substantially below the high of ${formatPrice(highest.price)}.`;
     }
   } else if (verdict === "fair_price") {
     headline = "Fair Price — Typical Market Range";
@@ -225,10 +254,11 @@ function generateBuyAdvice({
     headline,
     reason,
     score,
-    percentile,
+    rangePosition,
     recentTrend,
     recentChangeAmount: recentChangeAmount > 0 ? recentChangeAmount : undefined,
-    potentialSavings: potentialSavings > 0 ? potentialSavings : undefined
+    potentialSavings: potentialSavings > 0 ? potentialSavings : undefined,
+    limitedHistory: false
   };
 }
 

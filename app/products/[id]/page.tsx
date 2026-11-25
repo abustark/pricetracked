@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ObjectId } from "mongodb";
 import { notFound } from "next/navigation";
-import { calculatePriceStats, isObservedSample, OBSERVED_SOURCES } from "@/lib/analytics";
+import { calculatePriceStats, isObservedSample } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
+import { getFullRangeSummary, getLatestSamples } from "@/lib/history";
 import { getEffectiveScanEveryHours } from "@/lib/schedule";
 import { getViewer } from "@/lib/viewer";
 import type { PriceSampleDocument, ProductDocument } from "@/lib/types";
@@ -38,13 +39,22 @@ export default async function ProductPage({ params }: Props) {
   });
   if (!product) notFound();
 
-  const samples = await db
-    .collection<PriceSampleDocument>("price_samples")
-    .find({ productId, source: { $in: [...OBSERVED_SOURCES] } })
-    .sort({ capturedAt: 1 })
-    .limit(1000)
-    .toArray();
-  const stats = calculatePriceStats(samples, product.mrp);
+  const [samples, fullRange] = await Promise.all([
+    getLatestSamples(productId),
+    getFullRangeSummary(productId)
+  ]);
+  const stats = {
+    ...calculatePriceStats(samples, product.mrp),
+    fullRange: {
+      sampleCount: fullRange.sampleCount,
+      highest: fullRange.highest
+        ? { price: fullRange.highest.price, capturedAt: fullRange.highest.capturedAt.toISOString() }
+        : undefined,
+      lowest: fullRange.lowest
+        ? { price: fullRange.lowest.price, capturedAt: fullRange.lowest.capturedAt.toISOString() }
+        : undefined
+    }
+  };
   const currentPriceDrop = stats.current && stats.highest ? stats.highest.price - stats.current.price : 0;
   const isAtLowest = samples.length > 1 && stats.current?.price === stats.lowest?.price;
 
@@ -122,13 +132,13 @@ export default async function ProductPage({ params }: Props) {
       <section className="grid stats-grid" aria-label="Price statistics" data-reveal>
         <Stat label="Current price" value={stats.current ? formatMoney(stats.current.price, product.currency) : "None"} note={stats.current ? `as of ${formatDate(stats.current.capturedAt)}` : undefined} />
         <Stat
-          label="Lowest price"
-          value={stats.lowest ? formatMoney(stats.lowest.price, product.currency) : "None"}
-          note={stats.lowest ? `${formatDate(stats.lowest.capturedAt)}${stats.savings ? ` · ${stats.savings.percentage}% below MRP` : ""}` : undefined}
+          label="Lowest observed"
+          value={stats.fullRange?.lowest ? formatMoney(stats.fullRange.lowest.price, product.currency) : "None"}
+          note={stats.fullRange?.lowest ? formatDate(stats.fullRange.lowest.capturedAt) : undefined}
         />
-        <Stat label="Highest observed" value={stats.highest ? formatMoney(stats.highest.price, product.currency) : "None"} note={stats.highest ? formatDate(stats.highest.capturedAt) : undefined} />
-        <Stat label="Typical price" value={stats.common ? formatMoney(stats.common.price, product.currency) : "None"} note={stats.common ? `${stats.common.percentage}% of snapshots` : undefined} />
-        <Stat label="Price observations" value={String(stats.sampleCount)} note={`${stats.changes.count} ${stats.changes.count === 1 ? "change" : "changes"} observed`} />
+        <Stat label="Highest observed" value={stats.fullRange?.highest ? formatMoney(stats.fullRange.highest.price, product.currency) : "None"} note={stats.fullRange?.highest ? formatDate(stats.fullRange.highest.capturedAt) : undefined} />
+        <Stat label="Typical price" value={stats.common ? formatMoney(stats.common.price, product.currency) : "None"} note={stats.common ? `most common snapshot · ${stats.common.percentage}% of observations` : undefined} />
+        <Stat label="Price observations" value={String(stats.fullRange?.sampleCount ?? stats.sampleCount)} note={`${stats.changes.count} ${stats.changes.count === 1 ? "change" : "changes"} observed`} />
       </section>
 
       <section className="detail-grid" data-reveal>

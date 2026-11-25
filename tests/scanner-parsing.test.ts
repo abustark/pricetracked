@@ -97,12 +97,15 @@ describe("product HTML parsing", () => {
     expect(parsed.currency).toBe("USD");
   });
 
-  it("marks an out-of-stock product", () => {
+  it("does not infer stock from whole-page text (availability stays unknown)", () => {
     const html = `<html><head><title>Sold Out Item</title></head><body>
       <div class="sale-price">999</div>
       <p>Currently unavailable</p>
     </body></html>`;
 
-    expect(parseProductHtml(html, "other").inStock).toBe(false);
+    const parsed = parseProductHtml(html, "other");
+    expect(parsed.price).toBe(999);
+    expect(parsed.availability).toBe("unknown");
+    expect(parsed.inStock).toBeUndefined();
   });
 });

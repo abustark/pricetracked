@@ -45,3 +45,62 @@ export function getEffectiveScanEveryHours(scanEveryHours?: number): number {
   const configured = scanEveryHours && scanEveryHours > 0 ? scanEveryHours : DEFAULT_SCAN_EVERY_HOURS;
   return Math.max(configured, CRON_CADENCE_HOURS);
 }
+
+/**
+ * Dispatcher due-slot policy (P0 scheduler fix).
+ *
+ * The cron fires on a fixed slot boundary (daily 00:00 UTC). Scheduling the
+ * next scan from the wall-clock completion time ("completion + cadence")
+ * drifts: a scan finishing at 00:00:05 is not due at the next day's 00:00
+ * selection and can wait ~48 hours. Instead, every scan schedules its next
+ * due time from the SLOT boundary the attempt happened in — the start of the
+ * UTC day containing the attempt — so the product is always due at the next
+ * dispatcher run regardless of when the scan actually finished. A manual
+ * rescan mid-day also lands on the next dispatcher slot instead of silently
+ * postponing the scheduled freshness by up to a full cadence.
+ */
+export function startOfDispatchSlot(date: Date): Date {
+  const slot = new Date(date.getTime());
+  slot.setUTCHours(0, 0, 0, 0);
+  return slot;
+}
+
+/**
+ * Next due time for a scan attempt that happens in the slot containing `now`:
+ * the slot start plus the effective cadence. For the default 24h cadence this
+ * is exactly the next dispatcher slot, so successive daily runs never skip a
+ * product. For slower cadences (48h, 72h) it stays aligned to slot boundaries
+ * and fires once every N dispatcher runs.
+ */
+export function nextDueSlot(now: Date, cadenceHours: number): Date {
+  return new Date(startOfDispatchSlot(now).getTime() + cadenceHours * 60 * 60 * 1000);
+}
+
+/**
+ * Per-viewer watchlist quota. Bounds unbounded guest product creation (a
+ * fresh guest cookie is a viewer) and per-user scan work. Override with
+ * MAX_PRODUCTS_PER_USER (capped at 100).
+ */
+export const DEFAULT_MAX_PRODUCTS_PER_USER = 20;
+const MAX_PRODUCTS_PER_USER_CAP = 100;
+
+export function getMaxProductsPerUser(): number {
+  const raw = Number(process.env.MAX_PRODUCTS_PER_USER);
+  if (!Number.isFinite(raw) || raw < 1) return DEFAULT_MAX_PRODUCTS_PER_USER;
+  return Math.min(Math.floor(raw), MAX_PRODUCTS_PER_USER_CAP);
+}
+
+/**
+ * Minimum interval between two manual scans of the same product. Prevents a
+ * user (or a script) from hammering one product with rescans; scheduled
+ * cron scans are unaffected. Override with SCAN_COOLDOWN_MS (0 disables).
+ */
+const DEFAULT_SCAN_COOLDOWN_MS = 10 * 60 * 1000;
+
+export function getScanCooldownMs(): number {
+  const raw = process.env.SCAN_COOLDOWN_MS;
+  if (raw === undefined || raw === "") return DEFAULT_SCAN_COOLDOWN_MS;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return DEFAULT_SCAN_COOLDOWN_MS;
+  return Math.min(value, 24 * 60 * 60 * 1000);
+}

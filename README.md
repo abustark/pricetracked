@@ -60,7 +60,7 @@ bun run test          # single run
 bun run test:watch
 ```
 
-Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, scheduler locks and failure backoff, target-alert crossings, alert lifecycle, route ownership and error sanitisation.
+Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), **parser identity binding and offer-scoped availability**, URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, **dispatcher due-slot scheduling, scan quotas/cooldowns**, target-alert crossings and **alert durability**, **history window queries and chart time-axis scaling**, **OAuth server-bound state/PKCE**, route ownership and error sanitisation.
 
 CI (`.github/workflows/ci.yml`) runs `bun install --frozen-lockfile`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
 
@@ -82,6 +82,8 @@ https://your-vercel-domain.vercel.app/api/auth/callback/google
 
 Set the same `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SECRET`, and production `AUTH_URL` in Vercel environment variables.
 
+**Popup sign-in transaction binding:** the fast popup flow (styled pill → Google consent → `/auth/google/callback`) no longer trusts a client-side-only `state`. The client fetches a server-signed state token from `GET /api/auth/google/start` before opening Google; the code is only exchanged at `POST /api/auth/google` when the returned state verifies (HMAC signature, 10-minute window, single-use nonce) and the exchange carries the PKCE `code_verifier` for the S256 challenge (`lib/auth-state.ts`). A code captured from any other source is rejected with `400`.
+
 ## Deployment
 
 1. Push this folder to a GitHub repository.
@@ -101,8 +103,12 @@ The included `vercel.json` registers a cron job:
 Vercel Cron sends an HTTP `GET` request to the configured path in production. The schedule runs in UTC. Vercel Hobby projects are limited to daily cron jobs; on Pro you can change the schedule back to every 6 hours with `0 */6 * * *`.
 
 > **Scheduler constraint (Vercel Hobby):** this project runs on the free Hobby plan, which permits **daily cron only** (`0 0 * * *`). Scans therefore happen at most once per day in production regardless of the per-product `scanEveryHours` setting. The UI always shows the **effective** cadence — `max(scanEveryHours, 24)` from `lib/schedule.ts` — so products never advertise a 6-hour cadence they cannot get. Only after upgrading to Pro may the schedule become `0 */6 * * *`.
+>
+> **Due-slot policy:** the next scan is scheduled from the dispatcher slot boundary the attempt happened in (`nextDueSlot()` in `lib/schedule.ts`), never from "completion time + cadence". A scan finishing just after midnight is therefore due at the very next daily run instead of drifting out of it (~48h), and a mid-day manual rescan never silently postpones the scheduled freshness.
 
 **Cron run safety:** each cron run scans at most `CRON_SCAN_LIMIT` products (default 10, max 50) sequentially within a ~45s wall-clock budget (`CRON_TIME_BUDGET_MS`). Before any fetch, a product is claimed with an atomic `scanLockUntil` lock (5-minute TTL, stale locks self-expire) via `claimProductScan()` — overlapping cron runs and manual rescans cannot double-scan the same product. Failed scans preserve the last valid price, record `lastError`/`lastAttemptAt`, and retry at the next scheduled run; the product page shows the last successful scan separately from the last failed attempt.
+
+**Scan quotas and cooldowns:** every scan trigger (track-create, manual rescan, cron) flows through the same claim → scan → release policy (`requestProductScan()` / `scanClaimed()`). Watchlist creation is bounded by `MAX_PRODUCTS_PER_USER` (default 20, cap 100) per viewer — which also bounds guest creation — and manual rescans of the same product respect a cooldown (`SCAN_COOLDOWN_MS`, default 10 minutes, 0 disables) enforced before the scan lock is claimed.
 
 ## Observability
 
@@ -136,9 +142,17 @@ Target-price alerts are **in-app only**. There is no email or push delivery, and
 
 - Each product can have one target price plus an enabled/paused state (`targetPrice`, `targetAlertEnabled`).
 - A scan creates an alert event **only** when a genuine `direct`/`proxy` observation crosses the price from above the target to at-or-below it, **and** the alert is enabled. Repeated scans below the target never create duplicates — the product's `targetPriceReached` transition state is the idempotency guard, backed by a unique `{productId, target, observedAt}` index.
+- **Durability:** the crossing event is persisted *before* the reached state advances. If the alert insert fails, `targetPriceReached` stays `false` and the next genuine scan retries the crossing (the event insert is idempotent) instead of losing the alert permanently.
 - Setting a target while the current price is already at or below it shows the reached state immediately (with copy explaining the price was already below the target); it does not fabricate a crossing event.
 - Pausing keeps the target and price tracking but suppresses new alert events until resumed.
 - The watchlist shows a compact alert history (`AlertsPanel`): each event links to its product, can be marked read or dismissed, and can be bulk-marked read. Deleting a product deletes its alert events. Signed-out/guest tracking has no alert history surface.
+
+## Parsing, History & Honest Labels
+
+- **Identity-bound parsing:** structured-data candidates are matched against the product identity in the requested URL (ASIN/SKU/GTIN/product id). A recommendation JSON-LD that appears before the main product no longer wins; when several priced candidates exist and none matches, the scan fails closed instead of saving an arbitrary plausible price. The extraction method and identity-verified flag are recorded on each observation.
+- **Offer-scoped availability:** stock is read from the *selected* offer's structured availability and stored as `in_stock` / `out_of_stock` / `unknown`. `unknown` is never inferred from whole-page text, so a footer or recommendation cannot flip the main product to "out of stock".
+- **Latest-window history:** product history endpoints return the **latest** 1,000 observed samples (chronological), never the earliest thousand; full-history count and extrema are computed separately via `lib/history.ts` so statistics stay correct as history grows. The chart x-axis is **timestamp-scaled** (`lib/chart-scale.ts`) — equal distance means equal elapsed time, and gaps stay visible.
+- **Honest labels:** the advice statistic is a **range position** within the observed min–max, not a statistical percentile. Buy advice requires a minimum evidence gate (10 observations across 14+ days); below that the product page shows "Building history" instead of confident claims. The homepage hero chart is labelled **Illustrative chart**, and the hero tape is labelled **Current discounts vs MRP** (current MRP discounts, not observed historical drops — no shared drop feed exists yet).
 
 ## Scraping Notes
 

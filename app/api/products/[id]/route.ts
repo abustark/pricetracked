@@ -1,8 +1,9 @@
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { deleteAlertEventsForProduct } from "@/lib/alerts";
-import { calculatePriceStats, OBSERVED_SOURCES } from "@/lib/analytics";
+import { calculatePriceStats } from "@/lib/analytics";
 import { getDb } from "@/lib/db";
+import { getFullRangeSummary, getLatestSamples } from "@/lib/history";
 import { getViewer } from "@/lib/viewer";
 import type { PriceSampleDocument, ProductDocument } from "@/lib/types";
 
@@ -31,12 +32,10 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
-  const samples = await db
-    .collection<PriceSampleDocument>("price_samples")
-    .find({ productId, source: { $in: [...OBSERVED_SOURCES] } })
-    .sort({ capturedAt: 1 })
-    .limit(1000)
-    .toArray();
+  const [samples, fullRange] = await Promise.all([
+    getLatestSamples(productId),
+    getFullRangeSummary(productId)
+  ]);
 
   return NextResponse.json({
     product: {
@@ -48,7 +47,18 @@ export async function GET(_request: Request, { params }: Params) {
       _id: sample._id?.toString(),
       productId: sample.productId.toString()
     })),
-    stats: calculatePriceStats(samples, product.mrp)
+    stats: {
+      ...calculatePriceStats(samples, product.mrp),
+      fullRange: {
+        sampleCount: fullRange.sampleCount,
+        highest: fullRange.highest
+          ? { price: fullRange.highest.price, capturedAt: fullRange.highest.capturedAt.toISOString() }
+          : undefined,
+        lowest: fullRange.lowest
+          ? { price: fullRange.lowest.price, capturedAt: fullRange.lowest.capturedAt.toISOString() }
+          : undefined
+      }
+    }
   });
 }
 

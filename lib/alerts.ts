@@ -10,6 +10,13 @@ import type { AlertEventDocument, AlertEventView, ProductDocument } from "@/lib/
  * enabled — the transition state on the product (`targetPriceReached`) is the
  * dedupe mechanism, so repeated below-target scans never create new events.
  * Guests are skipped: they have no cross-device alert surface.
+ *
+ * Returns whether the crossing was durably recorded: `true` when the event was
+ * inserted, was already recorded (duplicate), or is not applicable (guest /
+ * no owner — the caller may then advance the reached state). Returns `false`
+ * only when the insert genuinely failed, so the caller can hold the reached
+ * state back and retry the crossing on the next scan instead of losing the
+ * event permanently.
  */
 export async function createAlertEvent(input: {
   productId: ObjectId;
@@ -18,10 +25,10 @@ export async function createAlertEvent(input: {
   observedPrice: number;
   currency: string;
   observedAt: Date;
-}): Promise<void> {
+}): Promise<boolean> {
   // Guests have no alert surface (and their products are migrated on sign-in
   // without alert events) — never store events for a guest id.
-  if (!input.userId || isGuestId(input.userId)) return;
+  if (!input.userId || isGuestId(input.userId)) return true;
 
   const db = await getDb();
   const event: AlertEventDocument = {
@@ -36,15 +43,17 @@ export async function createAlertEvent(input: {
 
   try {
     await db.collection<AlertEventDocument>("alert_events").insertOne(event);
+    return true;
   } catch (error) {
     // Unique index {productId, target, observedAt} — a duplicate insert for the
     // same scan (e.g. an unlikely concurrent double-fire) is a no-op. Any other
     // failure is logged as a short code only: an alert write must never fail the
-    // scan that produced it, and user data is never logged.
+    // scan that produced it, and user data is never logged. The caller uses the
+    // false return to retry the crossing instead of advancing the reached state.
     const code = (error as { code?: number })?.code;
-    if (code !== 11000) {
-      console.warn("[alerts] alert event insert failed", code ?? "unknown");
-    }
+    if (code === 11000) return true;
+    console.warn("[alerts] alert event insert failed", code ?? "unknown");
+    return false;
   }
 }
 

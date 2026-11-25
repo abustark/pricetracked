@@ -32,11 +32,17 @@ export type ProductDocument = {
   updatedAt: Date;
 };
 
+/** Offer-scoped availability. `unknown` is deliberately distinct from
+ * `out_of_stock`: availability must come from the selected offer, never from
+ * whole-page text that may belong to a recommendation or footer. */
+export type Availability = "in_stock" | "out_of_stock" | "unknown";
+
 export type PriceSampleDocument = {
   _id?: ObjectId;
   productId: ObjectId;
   price: number;
   currency: string;
+  availability?: Availability;
   inStock?: boolean;
   source: "direct" | "proxy" | "historical" | "mrp-baseline";
   capturedAt: Date;
@@ -50,7 +56,14 @@ export type ScanResult = {
   discountPercent?: number;
   currency: string;
   imageUrl?: string;
+  availability?: Availability;
   inStock?: boolean;
+  /** How the price was extracted (structured data, meta, store adapter, …). */
+  extractionMethod?: string;
+  /** True when the parsed offer was bound to the product identity in the
+   * requested URL. False means a single priced candidate was accepted without
+   * verifiable identity (the page exposed no identity fields). */
+  identityVerified?: boolean;
   source: "direct" | "proxy";
   /** Fetch attempts used (1 = no retry). Operational signal only. */
   attempts?: number;
@@ -63,10 +76,16 @@ export type BuyAdvice = {
   headline: string;
   reason: string;
   score: number;
-  percentile: number;
+  /** Position of the current price within the observed min–max range (0–100).
+   * This is a range position, NOT an empirical percentile. */
+  rangePosition: number;
   recentTrend: "falling" | "stable" | "rising";
   recentChangeAmount?: number;
   potentialSavings?: number;
+  /** True when there is not yet enough evidence (observation count and span)
+   * for a buy recommendation — the advice falls back to a building-history
+   * state instead of confident claims. */
+  limitedHistory?: boolean;
 };
 
 /** In-app target-price alert event. Created only when a genuine scan observes
@@ -112,4 +131,11 @@ export type PriceStats = {
     description: string;
   };
   advice?: BuyAdvice;
+  /** Aggregates over the ENTIRE observed history, not just the display
+   * window (latest `HISTORY_WINDOW_LIMIT` samples). */
+  fullRange?: {
+    sampleCount: number;
+    highest?: { price: number; capturedAt: string };
+    lowest?: { price: number; capturedAt: string };
+  };
 };

@@ -47,7 +47,7 @@ describe("price analytics", () => {
     expect(stats.advice?.recentTrend).toBe("rising");
   });
 
-  it("detects a falling price and an all-time low", () => {
+  it("detects a falling price but keeps a two-point history limited-evidence", () => {
     const stats = calculatePriceStats([
       makeSample(1000, { day: 1 }),
       makeSample(800, { day: 2 })
@@ -56,7 +56,37 @@ describe("price analytics", () => {
     expect(stats.current?.price).toBe(800);
     expect(stats.lowest?.price).toBe(800);
     expect(stats.advice?.recentTrend).toBe("falling");
+    // The minimum-evidence gate: two observations can never justify a
+    // confident "all-time low" buy claim.
+    expect(stats.advice?.verdict).toBe("fair_price");
+    expect(stats.advice?.limitedHistory).toBe(true);
+    expect(stats.advice?.headline).toBe("Building history");
+  });
+
+  it("gives confident advice only with enough observations and span", () => {
+    // 10 observations spread over 18 days (days 1, 3, …, 19) — past the gate.
+    const samples = Array.from({ length: 10 }, (_, index) =>
+      makeSample(index === 9 ? 800 : 1000, { day: 1 + index * 2 })
+    );
+
+    const stats = calculatePriceStats(samples);
+
+    expect(stats.advice?.limitedHistory).toBe(false);
+    expect(stats.advice?.recentTrend).toBe("falling");
     expect(stats.advice?.verdict).toBe("buy_now");
+    expect(typeof stats.advice?.rangePosition).toBe("number");
+  });
+
+  it("stays limited-evidence with enough observations but a short span", () => {
+    // 10 observations all inside 4 days — count passes, span does not.
+    const samples = Array.from({ length: 10 }, (_, index) =>
+      makeSample(1000 - index * 5, { day: 1 + (index % 4) })
+    );
+
+    const stats = calculatePriceStats(samples);
+
+    expect(stats.advice?.limitedHistory).toBe(true);
+    expect(stats.advice?.verdict).toBe("fair_price");
   });
 
   it("picks the cheapest price when counts tie for the common price", () => {

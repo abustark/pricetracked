@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { OAuth2Client } from "google-auth-library";
 import { encode } from "next-auth/jwt";
+import { verifyAuthState } from "@/lib/auth-state";
 
 /**
  * Fast popup sign-in endpoint.
@@ -47,9 +48,16 @@ function resolveSessionCookie(): { name: string; secure: boolean } {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { code?: string };
+    const body = (await req.json()) as { code?: string; state?: string; codeVerifier?: string };
     const code = body?.code;
     if (!code) return NextResponse.json({ error: "missing code" }, { status: 400 });
+
+    // The authorization code is only accepted when it is bound to a
+    // server-issued, unexpired, single-use sign-in state — this is what makes
+    // the exchange a continuation of the initiating browser transaction.
+    if (!body?.state || !verifyAuthState(body.state).valid) {
+      return NextResponse.json({ error: "invalid or expired sign-in state" }, { status: 400 });
+    }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -62,8 +70,12 @@ export async function POST(req: Request) {
     const redirectUri = `${new URL(req.url).origin}${POPUP_REDIRECT_PATH}`;
 
     // Server-to-server code exchange (client_secret stays on the server).
+    // PKCE verifier is forwarded when the client used the S256 challenge.
     const client = new OAuth2Client(clientId, clientSecret, redirectUri);
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await client.getToken({
+      code,
+      ...(body.codeVerifier ? { codeVerifier: body.codeVerifier } : {})
+    });
     if (!tokens.id_token) {
       return NextResponse.json({ error: "no id_token in exchange" }, { status: 401 });
     }

@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { sanitizeErrorMessage } from "@/lib/errors";
-import { claimProductScan, releaseScanLock, scanAndSaveProduct } from "@/lib/scanner";
+import { claimProductScan, scanClaimed, scanCooldownRemainingMs } from "@/lib/scanner";
 import { getViewer } from "@/lib/viewer";
 import type { ProductDocument } from "@/lib/types";
 
@@ -29,6 +29,18 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
+  // Manual-scan cooldown: prevents repeated rescans of the same product from
+  // hammering the retailer (scheduled cron scans are unaffected).
+  const remaining = scanCooldownRemainingMs(product);
+  if (remaining > 0) {
+    return NextResponse.json(
+      {
+        error: `A scan was requested recently for this product. Try again in ${Math.ceil(remaining / 60000)} minutes.`
+      },
+      { status: 429 }
+    );
+  }
+
   // Atomically claim the scan so a manual rescan cannot race a cron run (or
   // another manual rescan) into a duplicate simultaneous scan.
   const claimed = await claimProductScan(product._id!);
@@ -40,12 +52,9 @@ export async function POST(_request: Request, { params }: Params) {
   }
 
   try {
-    const updated = await scanAndSaveProduct(claimed.normalizedUrl, viewer.userId);
-    await releaseScanLock(claimed, { ok: true });
+    const updated = await scanClaimed(claimed);
     return NextResponse.json({ product: { ...updated, _id: updated._id?.toString() } });
   } catch (error) {
-    const rawMessage = error instanceof Error ? error.message : "Scan failed.";
-    await releaseScanLock(claimed, { ok: false, error: rawMessage });
     return NextResponse.json(
       { error: sanitizeErrorMessage(error, "Scan failed. Please try again.") },
       { status: 400 }

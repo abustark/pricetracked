@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.3`** (current head is `2.1.2` — see below)
+> - **`main` → `2.1.4`** (current head is `2.1.3` — see below)
 
 ---
 
@@ -200,3 +200,23 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `PROJECT-INFO.md`: reconciled to `2.1.2` — 75 commits.
 
 
+
+### 2.1.3 - Phase 1 correctness/security patch (audit findings)
+
+- **Date**: 2026-11-25
+- **Why**: owner request — implement Phase 1 of the final implementation plan (`02-FINAL-IMPLEMENTATION-PLAN.md`) against the reviewed baseline `e49a2bb`: correctness, security and truthful tracking behaviour, before any schema migration or visual redesign.
+- **Changes**:
+  - `lib/schedule.ts`: **dispatcher due-slot policy** — `startOfDispatchSlot()` / `nextDueSlot()` schedule the next scan from the cron slot boundary the attempt happened in, fixing the P0 bug where "completion + 24h" could skip the next daily selection (~48h freshness); also `getMaxProductsPerUser()` (default 20, cap 100) and `getScanCooldownMs()` (default 10 min, 0 disables).
+  - `lib/scanner.ts`: uses `nextDueSlot` on the create and failure paths; **identity-bound parsing** — `selectJsonLdProduct()` matches JSON-LD candidates (SKU/GTIN/identifier/URL) against the requested product identity (`extractRequestedIdentity()`), fails closed on ambiguous multi-candidate pages, and records `extractionMethod` + `identityVerified`; **offer-scoped availability** — `availability` (`in_stock`/`out_of_stock`/`unknown`) read from the selected offer only, replacing whole-page text inference; samples now store `availability`; new `scanClaimed()` (shared claim → scan → release), `requestProductScan()` (cooldown + claim for every scan trigger) and `scanCooldownRemainingMs()`; cron loop refactored onto `scanClaimed`; alert crossings now persist the event **before** advancing `targetPriceReached` (failed inserts retry on the next scan instead of losing the alert).
+  - `lib/types.ts`: `Availability` type; `ScanResult`/`PriceSampleDocument` carry `availability`; `ScanResult` carries `extractionMethod`/`identityVerified`; `BuyAdvice.percentile` renamed to `rangePosition` (a range position, not a percentile) plus `limitedHistory`; `PriceStats.fullRange` for full-history aggregates.
+  - `lib/history.ts` (new): `getLatestSamples()` (latest 1,000, chronological — fixes the oldest-first truncation that excluded the newest data) and `getFullRangeSummary()` (count + extrema over the full observed history).
+  - `lib/chart-scale.ts` (new): `timeScaleX()` — timestamp-scaled chart x-axis; `components/PriceChart.tsx` uses it so equal distance = equal elapsed time and gaps stay visible.
+  - `lib/auth-state.ts` (new): server-signed, single-use, 10-minute-window sign-in state tokens (HMAC + replay defence); `app/api/auth/google/start/route.ts` (new) issues them; `app/api/auth/google/route.ts` now **requires and verifies** the state before exchanging the code and forwards the PKCE `code_verifier`; `components/GoogleSignInPill.tsx` fetches the server state, generates an S256 PKCE challenge/verifier and sends state + verifier with the code; `app/auth/google/callback/page.tsx` fallback sends `state` too.
+  - `lib/alerts.ts`: `createAlertEvent()` now returns whether the crossing was durably recorded (`true` = inserted / duplicate / not applicable, `false` = real insert failure) so callers can hold the reached state back and retry.
+  - `lib/analytics.ts`: minimum-evidence gate for buy advice (≥10 observations across ≥14 days) — sparse/short histories return a "Building history" state instead of confident claims; range-position naming.
+  - `app/api/products/route.ts`: POST enforces the per-viewer product quota and routes creation through `requestProductScan`; `app/api/products/[id]/scan/route.ts`: manual rescans enforce the cooldown (429) and use `scanClaimed`; `app/api/products/[id]/route.ts` + `app/products/[id]/page.tsx`: latest-window samples + full-range aggregates; stats grid shows full-range extrema/count.
+  - `components/BuyAdviceCard.tsx`: range-position wording, "Building history" limited-history state; `app/page.tsx` + `app/globals.css`: hero chart labelled **Illustrative chart — decorative, not tracked data**; `components/RecentDrops.tsx`: tape relabelled **Current discounts vs MRP**; typical-price stat note clarified.
+  - **Tests** (114 → 153, all passing): new `tests/scanner-identity.test.ts` (identity binding, fail-closed ambiguity, offer-scoped availability), `tests/history.test.ts` (latest-window >1,000 regression, full-range aggregates), `tests/chart-scale.test.ts` (timestamp proportionality/gaps), `tests/auth-state.test.ts` + `tests/auth-google-route.test.ts` (issue/verify, tamper/expiry/replay, route rejects unbound codes, PKCE forwarding), `tests/alert-durability.test.ts` (reached state held back on insert failure, retry succeeds); extended `tests/schedule.test.ts` (due-slot policy, quotas, cooldown) and `tests/scanner-schedule.test.ts` (midnight-edge and mid-day due scheduling, scan policy); updated obsolete whole-page-stock and two-point "all-time low" tests to the new honest behaviour.
+  - `README.md`: due-slot policy, quotas/cooldowns, popup OAuth transaction binding, alert durability, parsing/history/honest-labels sections; test-coverage line updated.
+- **Gate results (this batch)**: `bun run test` **17 files / 153 tests passed**, `bun run typecheck` clean, `bun run lint` clean. `bun run build` compiles but fails **only** at the build-time Google Fonts fetch because this sandbox blocks `fonts.googleapis.com` egress — an environment limitation, not a code defect (the dev server renders the homepage 200 with fallback fonts and `/api/health` correctly reports `db: down` without a configured `MONGODB_URI`).
+- **Intentionally deferred to next batches**: shared catalog/history migration, watchlists rework, durable queue/worker/outbox, UI redesign (Phase 2+ per the plan). No production writes, deploys, migrations or paid services were performed.

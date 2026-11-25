@@ -86,7 +86,7 @@ describe("createAlertEvent", () => {
     expect(event.observedAt).toBe(observedAt);
   });
 
-  it("swallows duplicate-key writes", async () => {
+  it("treats duplicate-key writes as already recorded", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const insertOne = vi.fn().mockRejectedValue({ code: 11000 });
     getDbMock.mockResolvedValue({ collection: () => ({ insertOne }) });
@@ -100,12 +100,12 @@ describe("createAlertEvent", () => {
         currency: "INR",
         observedAt: new Date()
       })
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(true);
 
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("never fails the scan on an alert write error", async () => {
+  it("reports a real alert write failure so the caller can retry the crossing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const insertOne = vi.fn().mockRejectedValue({ code: 42 });
     getDbMock.mockResolvedValue({ collection: () => ({ insertOne }) });
@@ -119,7 +119,7 @@ describe("createAlertEvent", () => {
         currency: "INR",
         observedAt: new Date()
       })
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
 
     expect(warn).toHaveBeenCalledWith("[alerts] alert event insert failed", 42);
   });

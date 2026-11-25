@@ -86,6 +86,7 @@ export default async function Home() {
               <text x="476" y="119" textAnchor="middle" fill="var(--accent-strong)" fontSize="11" fontWeight="700" fontFamily="var(--font-geist-mono, monospace)">₹1,32,400</text>
             </g>
           </svg>
+          <p className="hero-chart-note">Illustrative chart — decorative, not tracked data</p>
 
           <div className="hero-tracker-card">
             <div className="tracker-card-heading">

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icons";
+import { timeScaleX } from "@/lib/chart-scale";
 
 type ChartSample = {
   price: number;
@@ -44,13 +45,13 @@ export function PriceChart({
 
   const points = useMemo(() => {
     if (chartSamples.length === 0) return [];
+    // Timestamp-scaled x-axis: equal horizontal distance = equal elapsed time,
+    // so gaps between observations show as gaps instead of fixed index spacing.
+    const times = chartSamples.map((sample) => new Date(sample.capturedAt).getTime());
+    const xs = timeScaleX(times, width, padding);
     return chartSamples.map((sample, index) => {
-      const x =
-        chartSamples.length === 1
-          ? width / 2
-          : padding + (index / (chartSamples.length - 1)) * (width - padding * 2);
       const y = height - padding - ((sample.price - min) / range) * (height - padding * 2);
-      return { x, y, sample, index };
+      return { x: xs[index], y, sample, index };
     });
   }, [chartSamples, min, range, width, height, padding]);
 

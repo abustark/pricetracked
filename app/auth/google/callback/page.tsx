@@ -38,7 +38,7 @@ function CallbackHandler() {
     fetch("/api/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, state }),
       credentials: "include"
     })
       .then((res) => {

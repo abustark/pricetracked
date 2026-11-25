@@ -8,10 +8,12 @@ import {
   SCAN_LOCK_TTL_MINUTES,
   getCronScanLimit,
   getCronTimeBudgetMs,
-  getEffectiveScanEveryHours
+  getEffectiveScanEveryHours,
+  getScanCooldownMs,
+  nextDueSlot
 } from "@/lib/schedule";
 import { assertAllowedProductUrl, canonicalizeStoreUrl, detectStore, getStoreLabel, resolveSupportedProductUrl } from "@/lib/stores";
-import type { PriceSampleDocument, ProductDocument, ScanResult, StoreKey } from "@/lib/types";
+import type { Availability, PriceSampleDocument, ProductDocument, ScanResult, StoreKey } from "@/lib/types";
 import { assertSafeFetchTarget } from "@/lib/url-guard";
 
 const USER_AGENT =
@@ -28,7 +30,10 @@ type ParsedProduct = {
   discountPercent?: number;
   currency: string;
   imageUrl?: string;
+  availability?: Availability;
   inStock?: boolean;
+  extractionMethod?: string;
+  identityVerified?: boolean;
 };
 
 type ProxyConfig = {
@@ -46,7 +51,7 @@ export async function fetchProductSnapshot(url: string): Promise<ScanResult> {
 
   try {
     const direct = await fetchHtml(canonicalUrl, store, "direct");
-    const parsed = parseProductHtml(direct.html, store);
+    const parsed = parseProductHtml(direct.html, store, { requestedUrl: canonicalUrl });
     if (parsed.price) {
       return {
         ...parsed,
@@ -64,7 +69,7 @@ export async function fetchProductSnapshot(url: string): Promise<ScanResult> {
   if (process.env.SCRAPER_PROXY_ENDPOINT) {
     try {
       const proxy = await fetchHtml(canonicalUrl, store, "proxy");
-      const proxyParsed = parseProductHtml(proxy.html, store);
+      const proxyParsed = parseProductHtml(proxy.html, store, { requestedUrl: canonicalUrl });
       if (proxyParsed.price) {
         return {
           ...proxyParsed,
@@ -119,6 +124,44 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
   const existing = await db.collection<ProductDocument>("products").findOne({ normalizedUrl: canonicalUrl, userId });
   const productId = existing?._id || new ObjectId();
 
+  // Target-alert crossing detection happens BEFORE the reached state is
+  // advanced. The event is persisted first, and `targetPriceReached` flips to
+  // true only when the crossing was durably recorded. If the alert insert
+  // fails, the state stays false and the next genuine scan retries the
+  // crossing (idempotent via the unique event index) instead of losing the
+  // event permanently. A target created while the price is already below it
+  // never fires here — it is handled in the PATCH route with its own copy.
+  const prevReached = existing?.targetPriceReached === true;
+  const priceAtOrBelowTarget =
+    existing?.targetPrice != null && snapshot.price != null
+      ? snapshot.price <= existing.targetPrice
+      : false;
+  const crossedToTarget = shouldCreateAlertEvent({
+    hasExistingProduct: existing != null,
+    targetPrice: existing?.targetPrice,
+    targetAlertEnabled: existing?.targetAlertEnabled,
+    previouslyReached: prevReached,
+    nowReached: priceAtOrBelowTarget
+  });
+
+  let alertPersisted = true;
+  if (crossedToTarget && existing?.targetPrice != null) {
+    alertPersisted = await createAlertEvent({
+      productId,
+      userId: existing.userId,
+      target: existing.targetPrice,
+      observedPrice: snapshot.price,
+      currency: snapshot.currency,
+      observedAt: now
+    });
+  }
+
+  const targetPriceReached = crossedToTarget
+    ? alertPersisted
+    : existing?.targetPrice != null && snapshot.price != null
+    ? snapshot.price <= existing.targetPrice
+    : existing?.targetPriceReached;
+
   const productUpdate: Omit<ProductDocument, "_id" | "createdAt"> = {
     url: canonicalUrl,
     normalizedUrl: canonicalUrl,
@@ -130,18 +173,15 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
     currency: snapshot.currency,
     active: true,
     scanEveryHours: existing?.scanEveryHours || DEFAULT_SCAN_EVERY_HOURS,
-    nextScanAt: new Date(
-      now.getTime() + getEffectiveScanEveryHours(existing?.scanEveryHours) * 60 * 60 * 1000
-    ),
+    // Stable dispatcher slot: due at the next cron slot boundary, not at
+    // "completion time + cadence" (which drifts and can skip a daily run).
+    nextScanAt: nextDueSlot(now, getEffectiveScanEveryHours(existing?.scanEveryHours)),
     lastScannedAt: now,
     lastPrice: snapshot.price,
     mrp: snapshot.mrp || existing?.mrp,
     discountPercent: snapshot.discountPercent || existing?.discountPercent,
     targetPrice: existing?.targetPrice,
-    targetPriceReached:
-      existing?.targetPrice != null && snapshot.price != null
-        ? snapshot.price <= existing.targetPrice
-        : existing?.targetPriceReached,
+    targetPriceReached,
     targetAlertEnabled: existing?.targetAlertEnabled,
     updatedAt: now
   };
@@ -163,39 +203,12 @@ export async function scanAndSaveProduct(inputUrl: string, userId?: string): Pro
     productId,
     price: snapshot.price,
     currency: snapshot.currency,
+    availability: snapshot.availability,
     inStock: snapshot.inStock,
     source: snapshot.source,
     capturedAt: now,
     createdAt: now
   });
-
-  // Target-alert crossing detection. Fires only for an existing product, on a
-  // genuine successful observation (this code path always has a real price),
-  // when the alert is enabled, and the price crossed from above the target to
-  // at-or-below it. The persisted `targetPriceReached` transition state prevents
-  // duplicate events on subsequent below-target scans. A target created while
-  // the price is already below it never fires here — it is handled in the PATCH
-  // route with its own copy.
-  const prevReached = existing?.targetPriceReached === true;
-  const nowReached = productUpdate.targetPriceReached === true;
-  const crossedToTarget = shouldCreateAlertEvent({
-    hasExistingProduct: existing != null,
-    targetPrice: existing?.targetPrice,
-    targetAlertEnabled: existing?.targetAlertEnabled,
-    previouslyReached: prevReached,
-    nowReached
-  });
-
-  if (crossedToTarget && existing?.targetPrice != null) {
-    await createAlertEvent({
-      productId,
-      userId: existing.userId,
-      target: existing.targetPrice,
-      observedPrice: snapshot.price,
-      currency: snapshot.currency,
-      observedAt: now
-    });
-  }
 
   return {
     _id: productId,
@@ -261,7 +274,8 @@ export async function releaseScanLock(
   }
 
   // Failed scan: keep the last valid price, record the error, schedule the next
-  // attempt at the effective cadence (cron fires daily on Vercel Hobby).
+  // attempt on the stable dispatcher slot (same policy as the success path —
+  // a failure must never drift the product out of the next daily selection).
   const cadenceHours = getEffectiveScanEveryHours(product.scanEveryHours);
   await db.collection<ProductDocument>("products").updateOne(
     { _id: productId },
@@ -271,11 +285,71 @@ export async function releaseScanLock(
         lastError: outcome.error || "Scan failed.",
         lastAttemptAt: now,
         failureCount: (product.failureCount || 0) + 1,
-        nextScanAt: new Date(now.getTime() + cadenceHours * 60 * 60 * 1000),
+        nextScanAt: nextDueSlot(now, cadenceHours),
         updatedAt: now
       }
     }
   );
+}
+
+/**
+ * Run one already-claimed product through a scan and always release its lock.
+ * Shared by the cron loop, the manual rescan route and the track (create)
+ * request path so every scan trigger follows the same claim → scan → release
+ * policy.
+ */
+export async function scanClaimed(claimed: ProductDocument): Promise<ProductDocument> {
+  let result: ProductDocument;
+  try {
+    result = await scanAndSaveProduct(claimed.normalizedUrl, claimed.userId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Scan failed.";
+    await releaseScanLock(claimed, { ok: false, error: message }, new Date());
+    throw error;
+  }
+  await releaseScanLock(claimed, { ok: true }, new Date());
+  return result;
+}
+
+/**
+ * Scan request policy shared by every trigger (create, manual rescan).
+ * - Existing product: enforce the manual-scan cooldown, then atomically claim
+ *   the scan lock so a create/rescan cannot race a cron run.
+ * - New product: no lock to claim; the initial scan proceeds.
+ */
+export async function requestProductScan(inputUrl: string, userId?: string): Promise<ProductDocument> {
+  const resolvedUrl = await resolveSupportedProductUrl(inputUrl);
+  const { store, normalizedUrl } = assertAllowedProductUrl(resolvedUrl);
+  const canonicalUrl = canonicalizeStoreUrl(normalizedUrl, store);
+
+  const db = await getDb();
+  const existing = await db
+    .collection<ProductDocument>("products")
+    .findOne({ normalizedUrl: canonicalUrl, userId });
+
+  if (existing?._id) {
+    const remaining = scanCooldownRemainingMs(existing);
+    if (remaining > 0) {
+      throw new Error(`A scan was requested recently for this product. Try again in ${Math.ceil(remaining / 60000)} minutes.`);
+    }
+
+    const claimed = await claimProductScan(existing._id);
+    if (!claimed) {
+      throw new Error("A scan is already in progress for this product. Try again in a minute.");
+    }
+    return scanClaimed(claimed);
+  }
+
+  return scanAndSaveProduct(canonicalUrl, userId);
+}
+
+/** Milliseconds until a manual rescan of this product is allowed (0 = ready). */
+export function scanCooldownRemainingMs(product: ProductDocument, now = new Date()): number {
+  const cooldownMs = getScanCooldownMs();
+  if (cooldownMs <= 0) return 0;
+  const last = product.lastAttemptAt ?? product.lastScannedAt;
+  if (!last) return 0;
+  return Math.max(0, cooldownMs - (now.getTime() - last.getTime()));
 }
 
 /**
@@ -326,12 +400,12 @@ export async function scanDueProducts(limit?: number): Promise<DueScanOutcome[]>
     }
 
     try {
-      await scanAndSaveProduct(claimed.normalizedUrl, claimed.userId);
-      await releaseScanLock(claimed, { ok: true }, new Date());
+      await scanClaimed(claimed);
       results.push({ id: claimed._id?.toString() || "", ok: true });
     } catch (error) {
+      // scanClaimed released the lock on both paths — only the outcome is
+      // recorded here.
       const message = error instanceof Error ? error.message : "Unknown scan error";
-      await releaseScanLock(claimed, { ok: false, error: message }, new Date());
       results.push({ id: claimed._id?.toString() || "", ok: false, error: message });
     }
 
@@ -613,6 +687,12 @@ function buildUserFacingScanError(store: StoreKey, error: unknown): Error {
     return new Error("The store blocked this request. Configure SCRAPER_PROXY_ENDPOINT to bypass.");
   }
 
+  if (/multiple priced products/i.test(message)) {
+    return new Error(
+      "Could not confirm the price belongs to the product in your link — the store page listed multiple priced items. Paste the exact product page URL and try again."
+    );
+  }
+
   return new Error("Could not read this product price. The store may have blocked the request or changed its page format.");
 }
 
@@ -620,14 +700,40 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function parseProductHtml(html: string, store: StoreKey): ParsedProduct {
-  const jsonLd = parseJsonLd(html);
+/**
+ * Parse a product page. Structured data is bound to the product identity in
+ * the requested URL: candidates whose SKU/GTIN/identifier/URL match the
+ * requested product win over recommendations; if several priced candidates
+ * exist and none match, parsing fails closed instead of saving an arbitrary
+ * plausible price. Availability is read from the SELECTED offer only — never
+ * from whole-page text — and `unknown` is distinct from `out_of_stock`.
+ */
+export function parseProductHtml(
+  html: string,
+  store: StoreKey,
+  options: { requestedUrl?: string } = {}
+): ParsedProduct {
+  const jsonLd = selectJsonLdProduct(html, store, options.requestedUrl);
   const meta = parseMeta(html);
   const title = cleanText(jsonLd.title || meta.title || extractTitle(html) || "Tracked product");
   const price = jsonLd.price || meta.price || parseStoreSpecificPrice(html, store) || parseVisiblePrice(html);
   const mrp = jsonLd.mrp || parseStoreSpecificMrp(html, store);
   const currency = normalizeCurrency(jsonLd.currency || meta.currency || "INR");
   const imageUrl = jsonLd.imageUrl || meta.imageUrl;
+
+  const extractionMethod = jsonLd.price
+    ? jsonLd.identityVerified
+      ? "jsonld-identity"
+      : "jsonld"
+    : meta.price
+    ? "meta"
+    : parseStoreSpecificPrice(html, store)
+    ? `store:${store}`
+    : parseVisiblePrice(html)
+    ? "visible"
+    : "none";
+
+  const availability = jsonLd.availability ?? "unknown";
 
   const discountPercent = mrp && price && mrp > price
     ? Math.round(((mrp - price) / mrp) * 100)
@@ -640,36 +746,186 @@ export function parseProductHtml(html: string, store: StoreKey): ParsedProduct {
     discountPercent,
     currency,
     imageUrl,
-    inStock: !/out of stock|currently unavailable|sold out/i.test(html)
+    availability,
+    inStock:
+      availability === "in_stock" ? true : availability === "out_of_stock" ? false : undefined,
+    extractionMethod,
+    identityVerified: jsonLd.identityVerified
   };
 }
 
-function parseJsonLd(html: string) {
+type JsonLdCandidate = {
+  title?: string;
+  price: number;
+  mrp?: number;
+  currency: string;
+  imageUrl?: string;
+  availability: Availability;
+  identity?: string;
+};
+
+/**
+ * Pick the JSON-LD product that belongs to the requested product. Identity
+ * match wins; a single priced candidate without verifiable identity is
+ * accepted (flagged `identityVerified: false`); multiple priced candidates
+ * with no identity match is ambiguous and fails closed.
+ */
+function selectJsonLdProduct(
+  html: string,
+  store: StoreKey,
+  requestedUrl?: string
+): Partial<JsonLdCandidate> & { identityVerified?: boolean } {
+  const candidates = parseJsonLdCandidates(html);
+  if (candidates.length === 0) return {};
+
+  const requested = requestedUrl ? extractRequestedIdentity(requestedUrl, store) : undefined;
+
+  if (requested) {
+    const matched = candidates.filter(
+      (candidate) =>
+        candidate.identity && candidate.identity.toLowerCase() === requested.toLowerCase()
+    );
+    if (matched.length > 0) {
+      return { ...matched[0], identityVerified: true };
+    }
+    if (candidates.length > 1) {
+      // Fail closed: never save an arbitrary plausible price from an
+      // unverifiable page (e.g. a recommendation JSON-LD before the main one).
+      throw new Error(
+        "The page exposed multiple priced products and none matched the product in your link."
+      );
+    }
+    return { ...candidates[0], identityVerified: false };
+  }
+
+  return { ...candidates[0], identityVerified: false };
+}
+
+function parseJsonLdCandidates(html: string): JsonLdCandidate[] {
   const matches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  const candidates: JsonLdCandidate[] = [];
 
   for (const match of matches) {
     const content = decodeHtml(match[1].trim());
-    const candidates = parseJsonSafely(content);
-    for (const item of flattenJsonLd(candidates)) {
+    const parsed = parseJsonSafely(content);
+    for (const item of flattenJsonLd(parsed)) {
       const type = Array.isArray(item?.["@type"]) ? item["@type"].join(" ") : item?.["@type"];
       if (!/product/i.test(String(type || "")) && !item?.offers) continue;
 
       const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
       const price = toPrice(offer?.price || offer?.lowPrice || item.price);
-      const mrp = toPrice(offer?.highPrice || item?.highPrice || (offer?.price && offer?.lowPrice && offer.price > offer.lowPrice ? offer.price : undefined));
-      if (price) {
-        return {
-          title: item.name,
-          price,
-          mrp,
-          currency: offer?.priceCurrency || item.priceCurrency || "INR",
-          imageUrl: Array.isArray(item.image) ? item.image[0] : item.image
-        };
-      }
+      if (!price) continue;
+
+      const mrp = toPrice(
+        offer?.highPrice ||
+          item?.highPrice ||
+          (offer?.price && offer?.lowPrice && offer.price > offer.lowPrice ? offer.price : undefined)
+      );
+
+      candidates.push({
+        title: item.name,
+        price,
+        mrp,
+        currency: offer?.priceCurrency || item.priceCurrency || "INR",
+        imageUrl: Array.isArray(item.image) ? item.image[0] : item.image,
+        availability: normalizeAvailability(offer?.availability),
+        identity: extractCandidateIdentity(item, offer)
+      });
     }
   }
 
-  return {};
+  return candidates;
+}
+
+/** Identity token for the requested product, derived from the product URL. */
+export function extractRequestedIdentity(url: string, store: StoreKey): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname;
+
+    if (store === "amazon") {
+      const asin = path.match(/\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})/i)?.[1];
+      if (asin) return asin.toUpperCase();
+    }
+    if (store === "flipkart") {
+      const id = path.match(/\/p\/([a-z0-9]+)/i)?.[1];
+      if (id) return id.toLowerCase();
+    }
+    if (store === "myntra") {
+      const id = path.match(/\/(\d{5,})\/buy/i)?.[1];
+      if (id) return id;
+    }
+    if (store === "ajio") {
+      const id = path.match(/-(\d{4,})(?:\.html)?(?:\/|\?|$)/i)?.[1];
+      if (id) return id;
+    }
+
+    const segments = path.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && /^[A-Za-z0-9_-]{4,}$/.test(last)) return last;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Identity token for a JSON-LD candidate, from SKU/GTIN/identifier/URL fields. */
+function extractCandidateIdentity(item: any, offer: any): string | undefined {
+  const identifier = item?.identifier;
+  const identifierValue =
+    typeof identifier === "string"
+      ? identifier
+      : identifier && typeof identifier === "object"
+      ? identifier.value
+      : undefined;
+
+  const values = [
+    item?.sku,
+    item?.gtin13,
+    item?.gtin8,
+    item?.mpn,
+    identifierValue,
+    item?.url,
+    offer?.url,
+    item?.["@id"]
+  ];
+
+  for (const value of values) {
+    if (typeof value !== "string" || value.length < 4) continue;
+    const token = identityTokenFromValue(value);
+    if (token) return token;
+  }
+  return undefined;
+}
+
+function identityTokenFromValue(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (/^[A-Za-z0-9]{10}$/.test(trimmed)) return trimmed.toUpperCase(); // ASIN
+  if (/^[A-Za-z0-9_-]{4,}$/.test(trimmed)) return trimmed;
+
+  // URLs: extract the product id from the path.
+  try {
+    const url = new URL(trimmed);
+    const asin = url.pathname.match(/\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})/i)?.[1];
+    if (asin) return asin.toUpperCase();
+    const flipkartId = url.pathname.match(/\/p\/([a-z0-9]+)/i)?.[1];
+    if (flipkartId) return flipkartId.toLowerCase();
+    const segments = url.pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && /^[A-Za-z0-9_-]{4,}$/.test(last)) return last;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function normalizeAvailability(value: unknown): Availability {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "unknown";
+  const leaf = raw.split("/").pop() || raw;
+  if (leaf === "instock") return "in_stock";
+  if (leaf === "outofstock") return "out_of_stock";
+  return "unknown";
 }
 
 function parseMeta(html: string) {

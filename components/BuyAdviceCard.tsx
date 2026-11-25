@@ -9,7 +9,7 @@ type Props = {
 export function BuyAdviceCard({ advice, currency }: Props) {
   if (!advice) return null;
 
-  const { verdict, headline, reason, score, percentile, recentTrend, recentChangeAmount, potentialSavings } =
+  const { verdict, headline, reason, score, rangePosition, recentTrend, recentChangeAmount, potentialSavings, limitedHistory } =
     advice;
 
   const formatMoney = (val: number) => {
@@ -81,19 +81,28 @@ export function BuyAdviceCard({ advice, currency }: Props) {
             </span>
           </div>
 
-          {/* Historical rank */}
-          <div className="advice-signal-chip">
-            <Icon name="trend" size={13} />
-            <span>
-              {percentile <= 5
-                ? "At all-time low"
-                : percentile <= 20
-                ? "Bottom 20% of observed prices"
-                : percentile >= 80
-                ? "Near peak observed price"
-                : "Within normal price band"}
-            </span>
-          </div>
+          {/* Observed range position (a range position, not a statistical
+              percentile) — suppressed while the history is still too sparse
+              to interpret. */}
+          {limitedHistory ? (
+            <div className="advice-signal-chip">
+              <Icon name="trend" size={13} />
+              <span>Building history — too few observations to rank</span>
+            </div>
+          ) : (
+            <div className="advice-signal-chip">
+              <Icon name="trend" size={13} />
+              <span>
+                {rangePosition <= 5
+                  ? "At the low end of the observed range"
+                  : rangePosition <= 20
+                  ? "In the bottom 20% of the observed range"
+                  : rangePosition >= 80
+                  ? "Near the high end of the observed range"
+                  : "Within the observed price band"}
+              </span>
+            </div>
+          )}
 
           {/* Savings indicator */}
           {potentialSavings ? (
