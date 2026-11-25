@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.4`** (current head is `2.1.3` — see below)
+> - **`main` → `2.1.5`** (current head is `2.1.4` — see below)
 
 ---
 
@@ -220,3 +220,18 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `README.md`: due-slot policy, quotas/cooldowns, popup OAuth transaction binding, alert durability, parsing/history/honest-labels sections; test-coverage line updated.
 - **Gate results (this batch)**: `bun run test` **17 files / 153 tests passed**, `bun run typecheck` clean, `bun run lint` clean. `bun run build` compiles but fails **only** at the build-time Google Fonts fetch because this sandbox blocks `fonts.googleapis.com` egress — an environment limitation, not a code defect (the dev server renders the homepage 200 with fallback fonts and `/api/health` correctly reports `db: down` without a configured `MONGODB_URI`).
 - **Intentionally deferred to next batches**: shared catalog/history migration, watchlists rework, durable queue/worker/outbox, UI redesign (Phase 2+ per the plan). No production writes, deploys, migrations or paid services were performed.
+
+### 2.1.4 - record owner decisions and revised phase scope
+
+- **Date**: 2026-11-25
+- **Why**: owner answered the Phase 0 decision questions (mode, data source, budget, notification channel); record them durably so later phases and future chats don't re-ask.
+- **Changes**:
+  - New `OWNER-DECISIONS.md` (repo root) — the four decisions with their implications:
+    1. **Mode**: personal use + small recruiter sign-in cohort, not a mainstream app → shared catalog/migration de-scoped; no public-pilot infrastructure.
+    2. **Data source**: direct retailer scraping + the existing scraper proxy → no PriceHistoryApp import or licensing (plan Phase 5 licensing dropped).
+    3. **Budget**: free only → Vercel Hobby (daily cron) + MongoDB Atlas free tier; no paid services.
+    4. **Notification channel**: in-app/site only → no notification outbox/email/push (plan Phase 3 delivery dropped).
+  - Includes a revised phase outlook table mapping each plan phase to its post-decision shape.
+  - `COMMIT-HISTORY.md` next-version line advanced.
+- **Gate results**: documentation only — no code changed; the `2.1.3` suite (17 files / 153 tests), typecheck and lint remain green.
+- **Next small phase** (pending owner go-ahead): Phase 2-revised — small correctness items with no migration, starting with the idempotent guest claim + visible status (P1: guest claim mutates DB during reads, failures return zero) and a `PROJECT-INFO.md` reconciliation to `2.1.3`.
