@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { OAuth2Client } from "google-auth-library";
 import { encode } from "next-auth/jwt";
 import { verifyAuthState } from "@/lib/auth-state";
+import { isGuestId } from "@/lib/guest";
+import {
+  CLAIM_STATUS_COOKIE,
+  GUEST_COOKIE,
+  setClaimPendingCookie
+} from "@/lib/viewer";
 
 /**
  * Fast popup sign-in endpoint.
@@ -46,7 +52,7 @@ function resolveSessionCookie(): { name: string; secure: boolean } {
   };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as { code?: string; state?: string; codeVerifier?: string };
     const code = body?.code;
@@ -113,6 +119,16 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: SESSION_MAX_AGE
     });
+    // Signal the guest-to-account watchlist claim transition: a guest cookie
+    // exists and no claim has been recorded yet. The claim itself runs later,
+    // from POST /api/claim, never during reads.
+    const requestCookies = req.cookies;
+    if (
+      isGuestId(requestCookies.get(GUEST_COOKIE)?.value) &&
+      !requestCookies.get(CLAIM_STATUS_COOKIE)?.value
+    ) {
+      setClaimPendingCookie(response);
+    }
     return response;
   } catch (error) {
     console.warn(

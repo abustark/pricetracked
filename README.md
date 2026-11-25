@@ -60,7 +60,7 @@ bun run test          # single run
 bun run test:watch
 ```
 
-Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), **parser identity binding and offer-scoped availability**, URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, **dispatcher due-slot scheduling, scan quotas/cooldowns**, target-alert crossings and **alert durability**, **history window queries and chart time-axis scaling**, **OAuth server-bound state/PKCE**, route ownership and error sanitisation.
+Coverage includes price parsing (JSON-LD, Open Graph, every store adapter, generic fallback, missing/malformed prices, currency normalisation), **parser identity binding and offer-scoped availability**, URL and SSRF safety, analytics provenance plus mixed-currency handling, scanner retry/blocked/proxy/redirect/size handling, **dispatcher due-slot scheduling, scan quotas/cooldowns**, target-alert crossings and **alert durability**, **history window queries and chart time-axis scaling**, **OAuth server-bound state/PKCE**, **explicit idempotent guest-claim + visible status**, route ownership and error sanitisation.
 
 CI (`.github/workflows/ci.yml`) runs `bun install --frozen-lockfile`, lint, typecheck, tests and a production build on every push and pull request. The workflow uses placeholder env values only; no test connects to a real database or store.
 
@@ -83,6 +83,8 @@ https://your-vercel-domain.vercel.app/api/auth/callback/google
 Set the same `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SECRET`, and production `AUTH_URL` in Vercel environment variables.
 
 **Popup sign-in transaction binding:** the fast popup flow (styled pill → Google consent → `/auth/google/callback`) no longer trusts a client-side-only `state`. The client fetches a server-signed state token from `GET /api/auth/google/start` before opening Google; the code is only exchanged at `POST /api/auth/google` when the returned state verifies (HMAC signature, 10-minute window, single-use nonce) and the exchange carries the PKCE `code_verifier` for the S256 challenge (`lib/auth-state.ts`). A code captured from any other source is rejected with `400`.
+
+**Guest→account watchlist claim:** `getViewer()` is a read-only resolver — it never mutates the database. The move of a signed-out browser watchlist into the signed-in Google account is an explicit, idempotent operation: the auth flows set a short-lived `claim-pending` cookie when a session is established with a guest cookie present, and `POST /api/claim` then moves the products (atomic per-product claims, duplicate URLs merged with samples re-pointed). The homepage shows honest inline status — a saved count or a failure with a retry — instead of a silent zero.
 
 ## Deployment
 
@@ -202,6 +204,12 @@ POST /api/products
 Content-Type: application/json
 
 { "url": "https://www.amazon.in/..." }
+```
+
+Move a signed-out browser watchlist into the signed-in account (explicit, idempotent — runs once after sign-in):
+
+```http
+POST /api/claim
 ```
 
 List products:

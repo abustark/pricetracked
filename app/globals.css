@@ -158,6 +158,9 @@ button { -webkit-tap-highlight-color: transparent; }
 
 
 .account-notice { margin: -34px 0 28px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 10px; color: var(--accent-strong); background: var(--accent-wash); font-size: 12px; font-weight: 700; }
+.account-notice-error { border-color: color-mix(in srgb, var(--danger) 30%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--danger); }
+.claim-retry-button { margin-left: 8px; border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: 8px; padding: 2px 10px; color: var(--danger); background: transparent; cursor: pointer; font-size: 12px; font-weight: 750; }
+.claim-retry-button:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .hero { margin-bottom: 110px; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(370px, 0.78fr); gap: clamp(42px, 8vw, 100px); align-items: center; }
 .hero-copy-block { padding: 11px 0 15px; }

@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import type { AlertEventView, ProductDocument } from "@/lib/types";
 import { AlertsPanel } from "@/components/AlertsPanel";
+import { ClaimWatchlist } from "@/components/ClaimWatchlist";
 import { TrackForm } from "@/components/TrackForm";
 import { ProductList } from "@/components/ProductList";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -38,11 +39,7 @@ export default async function Home() {
         </div>
       </header>
 
-      {viewer.claimedCount && viewer.claimedCount > 0 ? (
-        <div className="account-notice" role="status">
-          Saved {viewer.claimedCount} {viewer.claimedCount === 1 ? "product" : "products"} from this browser to your Google account.
-        </div>
-      ) : null}
+      <ClaimWatchlist pending={viewer.claimPending} claim={viewer.claim} />
 
       <section className="hero hero-grid">
         <div className="hero-copy-block">

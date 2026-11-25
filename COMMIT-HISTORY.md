@@ -7,7 +7,7 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.5`** (current head is `2.1.4` — see below)
+> - **`main` → `2.1.6`** (current head is `2.1.5` — see below)
 
 ---
 
@@ -235,3 +235,19 @@ This document tracks every commit following the `2.0.x` versioning schema:
   - `COMMIT-HISTORY.md` next-version line advanced.
 - **Gate results**: documentation only — no code changed; the `2.1.3` suite (17 files / 153 tests), typecheck and lint remain green.
 - **Next small phase** (pending owner go-ahead): Phase 2-revised — small correctness items with no migration, starting with the idempotent guest claim + visible status (P1: guest claim mutates DB during reads, failures return zero) and a `PROJECT-INFO.md` reconciliation to `2.1.3`.
+
+### 2.1.5 - phase 2-revised: explicit idempotent guest claim + project-info reconciliation
+
+- **Date**: 2026-11-25
+- **Why**: owner approved Phase 2-revised after the Phase 0 decisions (`OWNER-DECISIONS.md`): small correctness items, no migration. Primary target is the P1 finding "guest claim mutates DB during reads; failures return zero"; also reconciling `PROJECT-INFO.md` (resume/portfolio fact sheet) to the current code.
+- **Changes**:
+  - `lib/viewer.ts`: **`getViewer()` is now a pure read** — no database mutation. Exposes `claim: ClaimStatus` (read from the `claim-status` cookie) and `claimPending: boolean` (from the `claim-pending` cookie). `claimGuestProducts()` rewritten as an **explicit, idempotent operation**: atomic per-product `findOneAndUpdate` claims (guest-scoped filter — concurrent or repeated runs cannot double-move), duplicate-URL merges (samples re-pointed, guest doc deleted), duplicate-key claim treated as a merge, and **failures reported** in a structured `ClaimResult` (`{ status, claimed, merged, error }`) instead of being silently swallowed.
+  - `app/api/claim/route.ts` (new): `POST /api/claim` — the only place the claim runs. Requires a signed-in session, runs the claim, sets the `claim-status` cookie (`saved:<count>` / `failed`), and sanitizes failure messages.
+  - Auth flows signal the transition: `app/api/auth/google/route.ts` (popup exchange) and `app/api/auth/[...nextauth]/route.ts` (wrapped Auth.js handlers) set the short-lived `claim-pending` cookie when a session is established with a guest cookie present and no claim recorded yet.
+  - `components/ClaimWatchlist.tsx` (new): client component on the homepage — fires `POST /api/claim` once when pending, shows inline "Moving…" / "Saved N products…" / honest failure with a retry button; initialized from the server-provided claim status so a reload after a failed claim still offers retry.
+  - `app/page.tsx`: replaced the old inline `claimedCount` notice with `<ClaimWatchlist pending claim />`; `app/globals.css`: failure-notice + retry-button styles.
+  - **Tests** (new, 16): `tests/guest-claim.test.ts` (12 — move/merge/idempotency/concurrent-skip/duplicate-key/failure visibility/no-mutation-on-reads/claim-status cookie reading) and `tests/claim-route.test.ts` (4 — 401 unauthenticated, no-guest no-op, saved status cookie, sanitized failure + failed cookie); `tests/auth-google-route.test.ts` extended with claim-pending signal cases (guest cookie present / absent / claim already completed).
+  - `PROJECT-INFO.md`: fully reconciled to `2.1.5` — scanner 1,123 lines, 19 suites / 172 tests, 12 API routes / 17 handlers, 17 components, 16 lib modules, 92 files / ~9,984 lines, 30 commits on `main` (per GitHub), due-slot scheduling, quotas/cooldowns, identity-bound parsing, offer-scoped availability, timestamp chart axis, range-position advice + minimum-evidence gate, explicit idempotent guest claim, PKCE, updated resume/portfolio examples and keywords.
+  - `README.md`: documents the guest→account claim flow, `POST /api/claim`, and the extended test coverage.
+- **Gate results (this batch)**: `bun run test` **19 files / 172 tests passed**, `bun run typecheck` clean, `bun run lint` clean. Dev server verified: homepage renders `200` with the `ClaimWatchlist` component, `POST /api/claim` compiles and correctly returns `401 {status:"none"}` for unauthenticated callers (no compile errors; only the sandbox's known Google-Fonts fallback warnings).
+- **Intentionally deferred**: shared catalog/migrations (de-scoped by the owner's personal/cohort decision), notification outbox (in-app alerts only), durable queue/worker (free-tier constraint), UI redesign.
