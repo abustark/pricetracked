@@ -5,30 +5,42 @@ import { sanitizeErrorMessage } from "@/lib/errors";
 import { getMaxProductsPerUser } from "@/lib/schedule";
 import { requestProductScan } from "@/lib/scanner";
 import { getOrCreateViewer, getViewer, setGuestCookie } from "@/lib/viewer";
+import { queryWatchlist } from "@/lib/watchlist";
 import type { ProductDocument } from "@/lib/types";
 
 const TrackSchema = z.object({
   url: z.string().url()
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const viewer = await getViewer();
-  if (!viewer.userId) return NextResponse.json({ products: [] });
+  if (!viewer.userId) {
+    return NextResponse.json({ products: [], total: 0, page: 1, limit: 20, stores: [] });
+  }
+
+  const url = new URL(request.url);
+  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20));
 
   await ensureIndexes();
-  const db = await getDb();
-  const products = await db
-    .collection<ProductDocument>("products")
-    .find({ userId: viewer.userId })
-    .sort({ updatedAt: -1 })
-    .limit(50)
-    .toArray();
+  const { products, total, stores } = await queryWatchlist(viewer.userId, {
+    q: url.searchParams.get("q") ?? undefined,
+    store: url.searchParams.get("store") ?? undefined,
+    status: url.searchParams.get("status") ?? undefined,
+    sort: url.searchParams.get("sort") ?? undefined,
+    page,
+    limit
+  });
 
   return NextResponse.json({
     products: products.map((product) => ({
       ...product,
       _id: product._id?.toString()
-    }))
+    })),
+    total,
+    page,
+    limit,
+    stores
   });
 }
 

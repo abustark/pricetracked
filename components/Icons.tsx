@@ -1,5 +1,26 @@
 type IconProps = {
-  name: "arrow" | "arrowUp" | "bell" | "check" | "chevron" | "clock" | "globe" | "link" | "lock" | "logout" | "moon" | "spark" | "sun" | "trend" | "zap" | "external";
+  name:
+    | "arrow"
+    | "arrowUp"
+    | "bell"
+    | "check"
+    | "chevron"
+    | "clock"
+    | "globe"
+    | "link"
+    | "lock"
+    | "logout"
+    | "moon"
+    | "spark"
+    | "sun"
+    | "trend"
+    | "zap"
+    | "external"
+    | "search"
+    | "refresh"
+    | "trash"
+    | "user"
+    | "tag";
   size?: number;
   strokeWidth?: number;
 };
@@ -50,6 +71,16 @@ export function Icon({ name, size = 18, strokeWidth = 1.8 }: IconProps) {
       return <svg {...common}><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" /></svg>;
     case "external":
       return <svg {...common}><path d="M14 5h5v5M19 5l-8 8" /><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
+    case "search":
+      return <svg {...common}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>;
+    case "refresh":
+      return <svg {...common}><path d="M20 12a8 8 0 1 1-2.4-5.7" /><path d="M20 4v4.5h-4.5" /></svg>;
+    case "trash":
+      return <svg {...common}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12" /></svg>;
+    case "user":
+      return <svg {...common}><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>;
+    case "tag":
+      return <svg {...common}><path d="M4 12.5 11.5 5h7a1 1 0 0 1 1 1v7l-7.5 7.5a1.5 1.5 0 0 1-2.1 0l-6.4-6.4a1.5 1.5 0 0 1 0-2.1Z" /><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" /></svg>;
   }
 }
 

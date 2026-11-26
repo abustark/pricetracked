@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { LogoMark } from "@/components/Icons";
+import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BackButton } from "@/components/BackButton";
 
 export const metadata: Metadata = {
   title: "Privacy - PriceTracked",
@@ -11,17 +10,9 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="shell" id="main-content">
-      <BackButton />
-      <header className="topbar">
-        <Link className="brand" href="/" aria-label="PriceTracked home">
-          <LogoMark />
-          <span>PriceTracked</span>
-        </Link>
-        <nav className="main-nav" aria-label="Main navigation">
-          <Link href="/#watchlist">Watchlist</Link>
-        </nav>
-      </header>
+    <>
+      <SiteHeader session={null} path="/" />
+      <main className="shell" id="main-content">
 
       <article className="legal-page">
         <p className="eyebrow">Legal</p>
@@ -71,6 +62,7 @@ export default function PrivacyPage() {
       </article>
 
       <SiteFooter />
-    </main>
+      </main>
+    </>
   );
 }
