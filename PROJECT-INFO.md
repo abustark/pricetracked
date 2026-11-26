@@ -6,7 +6,7 @@
 > and tone to the target (resume = dense & quantified; portfolio = readable &
 > story-driven).
 >
-> **Last reconciled with the code:** `2.1.5` (2026-11-25).
+> **Last reconciled with the code:** `2.2.0` (2026-11-25).
 
 ---
 
@@ -34,7 +34,7 @@
 | Category | Technology | Version | Role |
 |---|---|---|---|
 | Framework | Next.js (App Router) | ^15.3.0 | SSR pages + API routes, Turbopack dev `:3010` |
-| UI | React | ^19.0.0 | Server + client components (16 in `components/`) |
+| UI | React | ^19.0.0 | Server + client components (29 in `components/`) |
 | UI DOM | react-dom | ^19.0.0 | Rendering |
 | Language | TypeScript | ^5.8.0 | Strict, `tsc --noEmit` gate |
 | Database | MongoDB Atlas | via `mongodb` ^6.16.0 driver (no ORM) | `products` + `price_samples` + `alert_events` |
@@ -103,9 +103,9 @@
 
 ## 6. Scale metrics (quantifiables)
 
-- **92** git-tracked files; **~9,984 lines** across TS/TSX/CSS (largest `lib/scanner.ts` 1,123, `app/globals.css` 771, `components/PriceChart.tsx` 379).
-- **12 API route files / 17 method handlers** (GET×7, POST×5, PATCH×2, DELETE×3) — including `POST /api/claim` and `GET /api/auth/google/start`.
-- **17 components** (server + client split), **16 lib modules**, **6 app pages** (`/`, `/products/[id]`, `/how-it-works`, `/privacy`, `/terms`, `/auth/google/callback`) plus `layout`, `not-found`, `loading` and `opengraph-image`.
+- **112** git-tracked files; **~12,144 lines** across TS/TSX/CSS (largest `lib/scanner.ts` 1,123, `app/globals.css` 1,326, `components/WatchlistTable.tsx` 421).
+- **12 API route files / 17 method handlers** (GET×7, POST×5, PATCH×2, DELETE×3) — including `POST /api/claim` and `GET /api/auth/google/start`; `GET /api/products` now serves the queryable watchlist (`q/store/status/sort/page/limit`).
+- **29 components** (server + client split, incl. the Direction A redesign primitives `Badge`, `Notice`, `EmptyState`, `StatusPill`, `SiteHeader`, `AddProductBar`, `SummaryCounts`, `WatchlistTable`, `AlertsList`, `ProductChart`, `ChartRangeTabs`, `SettingsPanel`), **17 lib modules** (incl. `lib/watchlist.ts`), **8 app pages** (`/`, `/products/[id]`, `/alerts`, `/settings`, `/how-it-works`, `/privacy`, `/terms`, `/auth/google/callback`) plus `layout`, `not-found`, `loading` and `opengraph-image`.
 - **3 collections, 7 indexes** (`products`: unique `{userId,normalizedUrl}`, `{active,nextScanAt}`, `{userId,updatedAt}`; `price_samples`: `{productId,capturedAt}`, `{productId,price}`; `alert_events`: `{userId,observedAt}`, unique `{productId,target,observedAt}`).
 - **4 dedicated stores + 1 generic**; **14-URL** recent-drops pool; **3 demo chips** (iPhone 16, WH-1000XM5, Pegasus).
 - Up to **1,000 observed samples** (`direct`/`proxy`) loaded per detail page, last **12** shown in "Recent scans"; chart downsamples to **220** points.
@@ -144,7 +144,7 @@ price tracker, ecommerce analytics, Next.js 15, App Router, React 19, TypeScript
 - Added atomic scan claiming with a 5-minute stale-lock TTL, bounded batch/time budgets, retry/backoff, failure counters and last-valid-price preservation so cron and manual rescans cannot double-scan, plus an explicit idempotent guest→account watchlist claim with visible status and retry.
 - Implemented Google OAuth via Auth.js (standard handler + fast popup code-exchange flow) with server-bound single-use state and S256 PKCE, guest UUID watchlists that merge into accounts on sign-in, plus idempotent in-app target-price alerts and manual rescan/history-reset actions.
 - Created a hand-rolled SVG price chart (timestamp-scaled x-axis, 220-point downsampling, MRP overlay, crosshair + keyboard inspection) with highest/lowest/mode/change-frequency stats and a coverage-qualified BUY/FAIR/WAIT verdict with deal score.
-- Shipped a themed responsive app (custom CSS, dark/light with FOUC guard, 6 pages, SEO/OG images) on Vercel; gated by ESLint, `tsc --noEmit`, a 19-suite Vitest unit suite (172 tests) and a GitHub Actions pipeline, with structured scan/cron logs and a MongoDB readiness endpoint.
+- Shipped a themed responsive app (custom CSS design system, dark/light with FOUC guard, 8 pages, SEO/OG images) on Vercel; gated by ESLint, `tsc --noEmit`, a 20-suite Vitest unit suite (184 tests) and a GitHub Actions pipeline, with structured scan/cron logs and a MongoDB readiness endpoint.
 
 **Resume project paragraph (3 lines):** Ecommerce price tracker built with Next.js 15, React 19 and MongoDB, deployed on Vercel with daily cron rescans. Features dedicated Amazon/Flipkart/Myntra/AJIO adapters plus generic fallback, Google sign-in with guest-to-account watchlist migration, and an interactive SVG history chart with buy advice and in-app target alerts. Ships as a themed responsive app with 12 API routes, per-user isolation, atomic scan locks and strict TypeScript + ESLint + Vitest gates.
 

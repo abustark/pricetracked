@@ -7,7 +7,33 @@ This document tracks every commit following the `2.0.x` versioning schema:
 - **One version number per agent response / request batch** — not per issue, not per commit: a single owner request (even if it fixes many issues) consumes exactly ONE version number, multiple commits inside one response all take that same number (fold follow-up fixes into it — never burn a second number), and only a genuinely new owner request (a new response turn) advances the number.
 
 > ### 📌 Next version — **keep this line current, every commit**
-> - **`main` → `2.1.6`** (current head is `2.1.5` — see below)
+> - **`main` → `2.2.1`** (current head is `2.2.0` — see below)
+
+
+### 2.2.0 - phase 4: research console UI redesign (tokens, workspace, product, alerts, settings)
+
+- **Date**: 2026-11-25
+- **Why**: owner requested a redesign ("redesign is needed"); the UI redesign plan (`04-UI-REDESIGN-PLAN.md`) was accepted and executed under Direction A "Research console" (UI-2 → UI-6). Portfolio project with no established visitor base, so a full lightweight redesign was welcome as the last implementation priority. UI skills were temp-installed from `vercel-labs/agent-skills` + `su-ron/find-skills` (not part of the repo) and applied.
+- **Changes**:
+  - `app/globals.css`: fully rewritten design system (Direction A) — tokens, surfaces, panels, tables, status dots/pills, buttons; ~354 old class names replaced (components rewritten, not just restyled).
+  - **Reusable primitives** (new, presentational/server-safe): `components/Badge.tsx`, `components/Notice.tsx` (role `alert` for errors), `components/EmptyState.tsx`, `components/StatusPill.tsx` (label carries meaning — colour is never the only signal).
+  - `components/SiteHeader.tsx` (new): shared topbar (Watchlist / Alerts / How it works, `aria-current="page"`, alerts `nav-badge` when unread); replaces the three duplicated inline headers on the homepage, product, how-it-works, alerts, settings, privacy and terms pages.
+  - `lib/watchlist.ts` (new): shared query layer — `productStatus()` (paused → error → stale → fresh from the effective scan cadence), `queryWatchlist()` (regex-escaped search across title/url/normalizedUrl, store + status filters, `latest`/`title`/`target` sorts, bounded pagination, distinct stores), `watchlistSummary()` (tracking / targets reached / needs attention).
+  - `app/api/products/route.ts`: GET now parses `q/store/status/sort/page/limit` and delegates to `queryWatchlist` (POST unchanged: quota check, scan, guest cookie).
+  - `components/AddProductBar.tsx` (new, client): track-a-product form with quota/scan error reporting and spinner state.
+  - `components/SummaryCounts.tsx` (new): three-card summary row (Tracking / Targets reached / Needs attention).
+  - `components/WatchlistTable.tsx` (new, client): URL-search-param-driven filters with server-rendered first page and client refetch; row actions rescan (`POST /api/products/:id/scan`, 429/409 handled), pause/resume (`PATCH {active}`), delete (confirm + `DELETE`); `en-IN` price formatting and relative scan times.
+  - `app/page.tsx`: rewritten as the workspace — SiteHeader + ClaimWatchlist, AddProductBar, SummaryCounts (signed-in only), service-notice on load failure, guest sign-in banner, empty state, WatchlistTable, and a "What you get" panel when logged out.
+  - `components/Icons.tsx`: added `search/refresh/trash/user/tag` variants.
+  - `components/ProductChart.tsx` + `components/ChartRangeTabs.tsx` (new, client): history chart with client-side 7D/30D/ALL range window (filters loaded snapshots by age without remounting the chart).
+  - `app/products/[id]/page.tsx`: migrated to the shared `SiteHeader` + `.detail-grid` layout; hero gets a `StatusPill`; chart uses the new range-tabbed `ProductChart`.
+  - `app/alerts/page.tsx` (new): alert screen with in-app-only alerts — sign-in prompt when logged out, empty state, and `components/AlertsList.tsx` (client: mark-read / mark-all-read / dismiss via `PATCH`/`DELETE /api/alerts`).
+  - `app/settings/page.tsx` (new) + `components/SettingsPanel.tsx` (new, client): theme picker (light/dark/system, persisted client-side) and account panel with sign-out.
+  - `app/how-it-works/page.tsx`: expanded engineering page — steps, "What you get" (real numbers: 6 insights, 1,000 snapshots, 4 adapters), feature cards, data & privacy notes, stack summary; all on the shared header.
+  - `app/privacy/page.tsx`, `app/terms/page.tsx`: migrated to the shared `SiteHeader`.
+  - **Tests** (new): `tests/watchlist-query.test.ts` (12) — `productStatus` precedence, search + regex escaping, store/status filters, title/latest/target sorting, pagination bounds, and summary counting via a filter-aware fake collection.
+- **Gate results (this batch)**: `bun run test` **20 files / 184 tests passed**, `bun run typecheck` clean, `bun run lint` clean. Dev server verified: `/`, `/alerts`, `/settings`, `/how-it-works`, `/privacy`, `/terms` and `/products/[id]` all return `200`; workspace, alerts, settings and engineering content render; invalid product id renders the not-found page (only the sandbox's known Google-Fonts egress warnings).
+- **Intentionally deferred**: email/push delivery (in-app alerts only, per owner), variant comparison, demo example page.
 
 ---
 
